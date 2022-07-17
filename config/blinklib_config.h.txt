@@ -1,0 +1,7 @@
+#ifndef BLINKLIB_CONFIG_H_
+#define BLINKLIB_CONFIG_H_
+
+// Disable datagrams, as they are unused in this project
+#define BGA_CUSTOM_BLINKLIB_DISABLE_DATAGRAM
+
+#endif

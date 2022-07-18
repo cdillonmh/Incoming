@@ -159,24 +159,24 @@ void determineDirectionality () {
 
 // Check if game should start
 void checkStartGame () {
-  if (buttonSingleClicked() && isEarth){
+  if (buttonSingleClicked() && isEarth && !hasWoken()){
     gameState = SINGLEPLAYER;
   }
-  else if (buttonDoubleClicked() && isEarth) {
+  else if (buttonDoubleClicked() && isEarth && !hasWoken()) {
     gameState = MULTIPLAYER;
   }
 }
 
 // Temp end game on longpress
 void tempCheckEndGame () {
-  if (buttonLongPressed() && isEarth){
+  if (buttonLongPressed() && isEarth && !hasWoken()){
     gameState = GAMEOVER;
   }
 }
 
 // End GAMEOVER state and return to SETUP
 void checkResetGame () {
-  if (buttonSingleClicked() && isEarth) {
+  if (buttonSingleClicked() && isEarth && !hasWoken()) {
     gameState = SETUP;
   }
 }

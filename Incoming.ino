@@ -47,12 +47,22 @@ void loop() {
   switch (gameState) {
     case SETUP:
       checkBlinkState(); //  Uses outside edge to help determine center Earth blink
-      //checkStartGame();
+      checkStartGame();
+      break;
+    case SINGLEPLAYER:
+    case MULTIPLAYER:
+      tempCheckEndGame();
+      break;
+    case GAMEOVER:
+      checkResetGame();
       break;
   }
 
-  commsHandler();
+  incomingCommsHandler();
+  outgoingCommsHandler();
   displayHandler();
+
+  consumeErrantClicks();
 }
 
 // Figure out layer position based on relative position to edge
@@ -115,7 +125,7 @@ void determineDirectionality () {
     faceDirection[f] = UNDETERMINED;
   }
 
-  // Find outers and inners
+  // Find outwards and inwards
   FOREACH_FACE(f) {
     if (isValueReceivedOnFaceExpired(f)) {
       faceDirection[f] = EDGE;
@@ -144,6 +154,30 @@ void determineDirectionality () {
         faceDirection[currentFace] = BACKWARD;
       }
     }
+  }
+}
+
+// Check if game should start
+void checkStartGame () {
+  if (buttonSingleClicked() && isEarth){
+    gameState = SINGLEPLAYER;
+  }
+  else if (buttonDoubleClicked() && isEarth) {
+    gameState = MULTIPLAYER;
+  }
+}
+
+// Temp end game on longpress
+void tempCheckEndGame () {
+  if (buttonLongPressed() && isEarth){
+    gameState = GAMEOVER;
+  }
+}
+
+// End GAMEOVER state and return to SETUP
+void checkResetGame () {
+  if (buttonSingleClicked() && isEarth) {
+    gameState = SETUP;
   }
 }
 
@@ -202,15 +236,70 @@ byte getGameStateOnFace (byte face) {
   }
 }
 
-void commsHandler() {
+void incomingCommsHandler() {
+  // Handle Game State Changes
+  FOREACH_FACE(face) {
+    if (isValueReceivedOnFaceExpired(face)) continue;
+
+    byte face_value = getGameStateOnFace(face);
+
+    if (cached_gameState[face] != face_value) {
+      // State changed. Update our own.
+      gameState = face_value;
+    }
+    cached_gameState[face] = face_value;
+  }
+}
+
+void outgoingCommsHandler() {
   setValueSentOnAllFaces((gameState << 6) + (blinkState << 4));
+}
+
+void inGameDisplay () {
+  if (isEarth) {
+    FOREACH_FACE(f) {
+      if (f%2 > 0) {
+        setColorOnFace(EARTHLAND, f);
+      }
+      else {
+        setColorOnFace(EARTHSEA, f);
+      }
+    }
+  }
+  else {
+  setColor (SPACECOLOR);
+  }
+}
+
+void gameoverDisplay () {
+  if (isEarth) {
+    setColor(CYAN);
+  }
+  else {
+    setColor(MAGENTA);
+  }
 }
 
 void displayHandler() {
   switch (gameState) {
     case SETUP: 
-      //layerTestDisplay(); // Verifies layer functionality
-      directionalityTestDisplay(); // Verifies directionality functionality
+      layerTestDisplay(); // Verifies layer functionality
+      //directionalityTestDisplay(); // Verifies directionality functionality
+      break;
+    case SINGLEPLAYER:
+    case MULTIPLAYER:
+      inGameDisplay();
+      break;
+    case GAMEOVER:
+      gameoverDisplay();
       break;
   }
+}
+
+void consumeErrantClicks () {
+  buttonPressed();
+  buttonSingleClicked();
+  buttonDoubleClicked();
+  buttonLongPressed();
+  hasWoken();
 }

@@ -40,7 +40,9 @@ enum projectiles {NOTHING, AST4, AST3, AST2, AST1, FAST2, FAST1, MISSILE};
 
 // Projectile Handling
 byte incomingProjectiles[] = {NOTHING, NOTHING, NOTHING, NOTHING, NOTHING, NOTHING};
+bool ACKReceive[] = {false, false, false, false, false, false};
 byte outgoingProjectiles[] = {NOTHING, NOTHING, NOTHING, NOTHING, NOTHING, NOTHING};
+bool ACKSend[] = {false, false, false, false, false, false};
 byte asteroidType = NOTHING;
 byte fasteroidType = NOTHING;
 bool hasMissile = false;
@@ -254,6 +256,7 @@ void directionalityTestDisplay (){
   }
 }
 
+// Extract bitwise values from face input
 byte getBlinkStateOnFace (byte face) {
   if (!isValueReceivedOnFaceExpired(face)){
     return ((getLastValueReceivedOnFace(face) >> 4) & 3);
@@ -266,18 +269,63 @@ byte getGameStateOnFace (byte face) {
   }
 }
 
+byte getProjectileStateOnFace (byte face) {
+  if (!isValueReceivedOnFaceExpired(face)){
+    return ((getLastValueReceivedOnFace(face) >> 1) & 7);
+  }
+}
+
+byte getACKStateOnFace (byte face) {
+  if (!isValueReceivedOnFaceExpired(face)){
+    return (getLastValueReceivedOnFace(face) & 1);
+  }
+}
+
+// Parse bitwise values from stored face input
+// WARNING! Slightly faster but less safe. Make sure
+// you've alreadyyy tested for expired face value!
+byte parseBlinkState (byte input) {
+  return ((getLastValueReceivedOnFace(input) >> 4) & 3);
+}
+
+byte parseGameState (byte input) {
+  return ((getLastValueReceivedOnFace(input) >> 6) & 3);
+}
+
+byte parseProjectileState (byte input) {
+  return ((getLastValueReceivedOnFace(input) >> 1) & 7);
+}
+
+byte parseACKState (byte input) {
+  return (getLastValueReceivedOnFace(input) & 1);
+}
+
 void incomingCommsHandler() {
-  // Handle Game State Changes
-  FOREACH_FACE(face) {
-    if (isValueReceivedOnFaceExpired(face)) continue;
+  FOREACH_FACE(f) {
+    if (isValueReceivedOnFaceExpired(f)) continue; //Skip open faces
+    
+    byte face_value = getLastValueReceivedOnFace(f); // Read once, parse for each value of interest
 
-    byte face_value = getGameStateOnFace(face);
-
-    if (cached_gameState[face] != face_value) {
-      // State changed. Update our own.
-      gameState = face_value;
+    // Handle Game State Changes
+    byte temp_value = parseGameState(face_value);
+    if (cached_gameState[f] != temp_value) {
+      // State changed! Update our own.
+      gameState = temp_value;
     }
-    cached_gameState[face] = face_value;
+    cached_gameState[f] = temp_value;
+
+    // Handle Incoming Projectiles
+    temp_value = parseProjectileState(face_value);
+    incomingProjectiles[f] = temp_value;
+    
+    // Handle Incoming ACKs
+    temp_value = parseACKState(face_value);
+    if (temp_value == 1) {
+      ACKReceive[f] = true;
+    }
+    else {
+      ACKReceive[f] = false;
+    }
   }
 }
 

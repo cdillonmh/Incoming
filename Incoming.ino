@@ -15,6 +15,11 @@
 #define EXPLOSIONCOLOR ORANGE
 #define DAMAGECOLOR RED
 
+// Game Balance
+#define ASTEROIDTRANSITTIMEMS 350
+#define MISSILETRANSITTIMEMS 250
+#define EXPLOSIONTIMEMS 500
+
 // Game States
 enum gameStates {SETUP, SINGLEPLAYER, MULTIPLAYER, GAMEOVER};
 byte gameState = SETUP;
@@ -24,9 +29,26 @@ byte cached_gameState[FACE_COUNT];
 enum blinkStates {L0, L1, L2, L3};
 byte blinkState = L0;
 bool isEarth = false;
+bool isEdge = false;
 
 // Projectile Types
 enum projectiles {NOTHING, AST4, AST3, AST2, AST1, FAST2, FAST1, MISSILE};
+
+// Projectile Handling
+byte incomingProjectiles[] = {NOTHING, NOTHING, NOTHING, NOTHING, NOTHING, NOTHING};
+byte outgoingProjectiles[] = {NOTHING, NOTHING, NOTHING, NOTHING, NOTHING, NOTHING};
+byte asteroidType = NOTHING;
+byte fasteroidType = NOTHING;
+bool hasMissile = false;
+bool missileRequested = false;
+int missileRequestFace = -1;
+bool isExploding = false;
+
+// Projectile Timers
+Timer asteroidTimer;
+Timer fasteroidTimer;
+Timer missileTimer;
+Timer explosionTimer;
 
 /*
  * BITWISE FACE COMMS
@@ -39,6 +61,10 @@ enum projectiles {NOTHING, AST4, AST3, AST2, AST1, FAST2, FAST1, MISSILE};
 enum faceDirections {EDGE, OUTWARD, INWARD, FORWARD, BACKWARD, UNDETERMINED};
 byte faceDirection[FACE_COUNT];
 
+// General Timers
+Timer animationTimer;
+
+
 void setup() {
   randomize(); //Seed RNG
 }
@@ -46,7 +72,7 @@ void setup() {
 void loop() {
   switch (gameState) {
     case SETUP:
-      checkBlinkState(); //  Uses outside edge to help determine center Earth blink
+      checkBlinkState(); // Uses outside edge to help determine center Earth blink
       checkStartGame();
       break;
     case SINGLEPLAYER:
@@ -67,14 +93,14 @@ void loop() {
 
 // Figure out layer position based on relative position to edge
 void checkBlinkState (){
-  bool hasEdge = false; // Local variable to check for open edge
+  isEdge = false;
   FOREACH_FACE(f) {
     if (isValueReceivedOnFaceExpired(f)) {
       // Found an open edge!
-      hasEdge = true;
+      isEdge = true;
     }
   }
-  if (hasEdge) {
+  if (isEdge) {
     blinkState = L0;
   }
   else {

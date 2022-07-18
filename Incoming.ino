@@ -283,21 +283,21 @@ byte getACKStateOnFace (byte face) {
 
 // Parse bitwise values from stored face input
 // WARNING! Slightly faster but less safe. Make sure
-// you've alreadyyy tested for expired face value!
+// you've already tested for expired face value!
 byte parseBlinkState (byte input) {
-  return ((getLastValueReceivedOnFace(input) >> 4) & 3);
+  return ((input >> 4) & 3);
 }
 
 byte parseGameState (byte input) {
-  return ((getLastValueReceivedOnFace(input) >> 6) & 3);
+  return ((input >> 6) & 3);
 }
 
 byte parseProjectileState (byte input) {
-  return ((getLastValueReceivedOnFace(input) >> 1) & 7);
+  return ((input >> 1) & 7);
 }
 
 byte parseACKState (byte input) {
-  return (getLastValueReceivedOnFace(input) & 1);
+  return (input & 1);
 }
 
 void incomingCommsHandler() {

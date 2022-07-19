@@ -4,6 +4,19 @@
  * By Dillon Hall
  */
 
+/*
+ *  KNOWN NEXT STEPS:
+ *  1. Sender stops sending when ACK is seen
+ *  2. Earth receives MISSILE request, checks against cooldown timer, and sends MISSILE
+ */
+
+/* 
+ *  IDEAS:
+ *  - Can use blinkState (currently only used in setup) during in-game for something else...
+ *    + Global missile cooldown?
+ *    + Increasing difficulty levels?
+ *    + Other stuff for multiplayer mode?
+ */
 
 // Color Defaults
 #define SPACECOLOR OFF
@@ -18,6 +31,7 @@
 // Game Balance
 #define ASTEROIDTRANSITTIMEMS 350
 #define MISSILETRANSITTIMEMS 250
+#define MISSILECOOLDOWNTIMEMS 500
 #define EXPLOSIONTIMEMS 500
 
 // General presets
@@ -33,21 +47,23 @@ byte cached_gameState[FACE_COUNT];
 enum blinkStates {L0, L1, L2, L3};
 byte blinkState = L0;
 bool isEarth = false;
-bool isEdge = false;
 
 // Projectile Types
 enum projectiles {NOTHING, AST4, AST3, AST2, AST1, FAST2, FAST1, MISSILE};
 
 // Projectile Handling
 byte incomingProjectiles[] = {NOTHING, NOTHING, NOTHING, NOTHING, NOTHING, NOTHING};
-bool ACKReceive[] = {false, false, false, false, false, false};
+byte receivedProjectiles[] = {NOTHING, NOTHING, NOTHING, NOTHING, NOTHING, NOTHING};
+byte ACKReceive[] = {0, 0, 0, 0, 0, 0};
 byte outgoingProjectiles[] = {NOTHING, NOTHING, NOTHING, NOTHING, NOTHING, NOTHING};
-bool ACKSend[] = {false, false, false, false, false, false};
+byte projectilesBuffer[] = {NOTHING, NOTHING, NOTHING, NOTHING, NOTHING, NOTHING};
+byte ACKSend[] = {0, 0, 0, 0, 0, 0};
 byte asteroidType = NOTHING;
 byte fasteroidType = NOTHING;
 bool hasMissile = false;
 bool missileRequested = false;
 int missileRequestFace = -1;
+int missileRequestedFace = -1;
 bool isExploding = false;
 
 // Projectile Timers
@@ -73,6 +89,7 @@ Timer animationTimer;
 
 void setup() {
   randomize(); //Seed RNG
+  animationTimer.set(ANIMATIONTIMERMS);
 }
 
 void loop() {
@@ -83,6 +100,8 @@ void loop() {
       break;
     case SINGLEPLAYER:
     case MULTIPLAYER:
+      projectileTimerHandler();
+      inputHandler();
       tempCheckEndGame();
       break;
     case GAMEOVER:
@@ -91,6 +110,8 @@ void loop() {
   }
 
   incomingCommsHandler();
+  projectileReceiver();
+  projectileManager();
   outgoingCommsHandler();
   displayHandler();
 
@@ -99,14 +120,14 @@ void loop() {
 
 // Figure out layer position based on relative position to edge
 void checkBlinkState (){
-  isEdge = false;
+  bool hasEdge = false;
   FOREACH_FACE(f) {
     if (isValueReceivedOnFaceExpired(f)) {
       // Found an open edge!
-      isEdge = true;
+      hasEdge = true;
     }
   }
-  if (isEdge) {
+  if (hasEdge) {
     blinkState = L0;
   }
   else {
@@ -181,6 +202,7 @@ void determineDirectionality () {
     if (faceDirection[currentFace] == UNDETERMINED) {
       if (faceDirection[nextFace] == INWARD) {
         faceDirection[currentFace] = FORWARD;
+        missileRequestFace = nextFace;
       }
       else {
         faceDirection[currentFace] = BACKWARD;
@@ -196,6 +218,39 @@ void checkStartGame () {
   }
   else if (buttonDoubleClicked() && isEarth && !hasWoken()) {
     gameState = MULTIPLAYER;
+  }
+}
+
+// Check and handle expired projectile timers
+void projectileTimerHandler () {
+
+  // Handle Missiles
+  if (hasMissile && missileTimer.isExpired()) {
+    if (!missileRequested) {
+      sendProjectileOnFace(MISSILE,missileRequestedFace);
+    }
+    else {
+      startExplosion();
+    }
+  }
+
+  // Handle Explosions
+  if (isExploding && explosionTimer.isExpired()) {
+    isExploding = false;
+  }
+}
+
+void startExplosion () {
+  hasMissile = false;
+  isExploding = true;
+  explosionTimer.set(EXPLOSIONTIMEMS);
+}
+
+// Look for and interpret inputs during gameplay
+void inputHandler () {
+  if (buttonSingleClicked() && !isEarth && !hasWoken() && !missileRequested) {
+    missileRequested = true;
+    sendProjectileOnFace(MISSILE, missileRequestFace);
   }
 }
 
@@ -256,6 +311,7 @@ void directionalityTestDisplay (){
   }
 }
 
+
 // Extract bitwise values from face input
 byte getBlinkStateOnFace (byte face) {
   if (!isValueReceivedOnFaceExpired(face)){
@@ -300,6 +356,7 @@ byte parseACKState (byte input) {
   return (input & 1);
 }
 
+
 void incomingCommsHandler() {
   FOREACH_FACE(f) {
     if (isValueReceivedOnFaceExpired(f)) continue; //Skip open faces
@@ -315,22 +372,100 @@ void incomingCommsHandler() {
     cached_gameState[f] = temp_value;
 
     // Handle Incoming Projectiles
-    temp_value = parseProjectileState(face_value);
-    incomingProjectiles[f] = temp_value;
+    if (incomingProjectiles[f] != NOTHING){
+      incomingProjectiles[f] = parseProjectileState(face_value);
+    }
     
     // Handle Incoming ACKs
-    temp_value = parseACKState(face_value);
-    if (temp_value == 1) {
-      ACKReceive[f] = true;
-    }
-    else {
-      ACKReceive[f] = false;
+    ACKReceive[f] = parseACKState(face_value);
+  }
+}
+
+void projectileReceiver () {
+  FOREACH_FACE(f) {
+    if (isValueReceivedOnFaceExpired(f)) continue; //Skip open faces
+
+    if ((receivedProjectiles[f] == NOTHING) && (incomingProjectiles[f] != NOTHING)) {       // If we have something to receive and room for it,
+      if ((ACKSend[f] == 1) && (incomingProjectiles[f] != getProjectileStateOnFace(f))) {   // and have already ACK'd and been confirmed,
+        receivedProjectiles[f] = incomingProjectiles[f];                                    // move projectile to received area for handling,
+        incomingProjectiles[f] = NOTHING;                                                   // clear it from incoming,
+        ACKSend[f] == 0;                                                                    // and clear ACK sender.
+      }
+      else { //if (ACKSend[f] != 1) { // May not be a disconfirming case, and no harm in double setting so why check?
+        ACKSend[f] = 1;
+      }
     }
   }
 }
 
+void projectileManager () {
+  FOREACH_FACE(f) {
+    if (isValueReceivedOnFaceExpired(f)) continue; //Skip open faces
+
+    byte tempProjectile = receivedProjectiles[f];
+    
+    if (tempProjectile != NOTHING) {
+      byte tempDirection = faceDirection[f];
+      
+      switch (tempProjectile) {
+        case MISSILE:
+          if (tempDirection == OUTWARD) { // Missile request received! Pass on immediately inward.
+            missileRequestedFace = f;
+            sendProjectileOnFace(MISSILE, missileRequestFace);
+          }
+          else { // Actual missile received!
+            gained(MISSILE);
+          }
+          break;          
+      }
+      receivedProjectiles[f] = NOTHING; // Projectile handled, clear from receiving array.
+    }
+  }
+}
+
+void gained (byte proj) {
+  switch (proj) {
+    case MISSILE:
+      hasMissile = true;
+      missileTimer.set(MISSILETRANSITTIMEMS);
+      break;
+  }
+}
+
+void sendProjectileOnFace (byte proj, int face) {
+  processBufferOnFace(face);
+  if (outgoingProjectiles[face] == NOTHING) {
+    outgoingProjectiles[face] = proj;
+    clearSentProjectile(proj);
+  }
+  else if (projectilesBuffer[face] == NOTHING) {
+    projectilesBuffer[face] = proj;
+    clearSentProjectile(proj);
+  }
+}
+
+void clearSentProjectile (byte proj) {
+  switch (proj) {
+    case MISSILE:
+      hasMissile = false;
+      break;
+  }
+}
+
+void processBufferOnFace (int f) {
+  if ((projectilesBuffer[f] != NOTHING) && (outgoingProjectiles[f] == NOTHING)) {
+    outgoingProjectiles[f] = projectilesBuffer[f];
+    projectilesBuffer[f] = NOTHING;
+  }
+}
+
 void outgoingCommsHandler() {
-  setValueSentOnAllFaces((gameState << 6) + (blinkState << 4));
+
+  FOREACH_FACE(f) {
+    if (isValueReceivedOnFaceExpired(f)) continue; //Skip open faces
+
+    setValueSentOnFace((gameState << 6) + (blinkState << 4) + (outgoingProjectiles[f] << 1) + ACKSend[f], f);
+  }
 }
 
 void inGameDisplay () {
@@ -347,6 +482,10 @@ void inGameDisplay () {
   else {
   setColor (SPACECOLOR);
   }
+
+  if (isExploding) {
+    setColor (ORANGE);
+  }
 }
 
 void gameoverDisplay () {
@@ -359,6 +498,8 @@ void gameoverDisplay () {
 }
 
 void displayHandler() {
+  if (animationTimer.isExpired()) animationTimer.set(ANIMATIONTIMERMS);
+  
   switch (gameState) {
     case SETUP: 
       layerTestDisplay(); // Verifies layer functionality

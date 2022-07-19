@@ -5,9 +5,14 @@
  */
 
 /*
- *  KNOWN NEXT STEPS:
- *  1. Sender stops sending when ACK is seen
- *  2. Earth receives MISSILE request, checks against cooldown timer, and sends MISSILE
+ *  KNOWN ISSUES:
+ *  - Blink gets locked in waiting for MISSILE if original request fails, won't initiate new requests
+ */
+
+/*
+ *  NEXT STEPS:
+ *  - Animate MISSILE after sent and in transit (Utilize existing projectile code, as per debug?)
+ *  - Create reset function to clear out game variables when game over
  */
 
 /* 
@@ -30,13 +35,13 @@
 
 // Game Balance
 #define ASTEROIDTRANSITTIMEMS 350
-#define MISSILETRANSITTIMEMS 250
+#define MISSILETRANSITTIMEMS 100
 #define MISSILECOOLDOWNTIMEMS 500
 #define EXPLOSIONTIMEMS 500
 
 // General presets
 #define ANIMATIONTIMERMS 1000
-#define PROJECTILETIMEOUTTIMERMS 200
+//#define PROJECTILETIMEOUTTIMERMS 200
 
 // Game States
 enum gameStates {SETUP, SINGLEPLAYER, MULTIPLAYER, GAMEOVER};
@@ -70,6 +75,7 @@ bool isExploding = false;
 Timer asteroidTimer;
 Timer fasteroidTimer;
 Timer missileTimer;
+Timer missileCooldownTimer;
 Timer explosionTimer;
 
 /*
@@ -241,6 +247,7 @@ void projectileTimerHandler () {
 }
 
 void startExplosion () {
+  missileRequested = false;
   hasMissile = false;
   isExploding = true;
   explosionTimer.set(EXPLOSIONTIMEMS);
@@ -372,12 +379,19 @@ void incomingCommsHandler() {
     cached_gameState[f] = temp_value;
 
     // Handle Incoming Projectiles
-    if (incomingProjectiles[f] != NOTHING){
+    if (incomingProjectiles[f] == NOTHING){
       incomingProjectiles[f] = parseProjectileState(face_value);
     }
     
     // Handle Incoming ACKs
     ACKReceive[f] = parseACKState(face_value);
+    ACKHandler(f);
+  }
+}
+
+void ACKHandler (int face) {
+  if ((ACKReceive[face] == 1) && (outgoingProjectiles[face] != NOTHING)) {
+    outgoingProjectiles[face] = NOTHING;
   }
 }
 
@@ -389,9 +403,9 @@ void projectileReceiver () {
       if ((ACKSend[f] == 1) && (incomingProjectiles[f] != getProjectileStateOnFace(f))) {   // and have already ACK'd and been confirmed,
         receivedProjectiles[f] = incomingProjectiles[f];                                    // move projectile to received area for handling,
         incomingProjectiles[f] = NOTHING;                                                   // clear it from incoming,
-        ACKSend[f] == 0;                                                                    // and clear ACK sender.
+        ACKSend[f] = 0;                                                                    // and clear ACK sender.
       }
-      else { //if (ACKSend[f] != 1) { // May not be a disconfirming case, and no harm in double setting so why check?
+      else { //if (ACKSend[f] != 1) { // May not be a disconfirming case, and no harm in double setting, so why check?
         ACKSend[f] = 1;
       }
     }
@@ -409,9 +423,15 @@ void projectileManager () {
       
       switch (tempProjectile) {
         case MISSILE:
-          if (tempDirection == OUTWARD) { // Missile request received! Pass on immediately inward.
-            missileRequestedFace = f;
-            sendProjectileOnFace(MISSILE, missileRequestFace);
+          if (tempDirection == OUTWARD) { // Missile request received! Pass on immediately inward if not Earth.
+            if (!isEarth) {
+              missileRequestedFace = f;
+              sendProjectileOnFace(MISSILE, missileRequestFace);
+            }
+            else if (missileCooldownTimer.isExpired()) { // If Earth and cooldown expired, bounce the request back.
+              sendProjectileOnFace(MISSILE, f);
+              missileCooldownTimer.set(MISSILECOOLDOWNTIMEMS);
+            }
           }
           else { // Actual missile received!
             gained(MISSILE);
@@ -488,6 +508,20 @@ void inGameDisplay () {
   }
 }
 
+void commsDebugDisplay () {
+  FOREACH_FACE(f) {
+    if (outgoingProjectiles[f] == MISSILE){
+      setColorOnFace (CYAN, f);
+    }
+    else if (incomingProjectiles[f] == MISSILE) {
+      setColorOnFace (MAGENTA, f);
+    }
+    else if (ACKSend[f] == 1) {
+      setColorOnFace (YELLOW, f);
+    }
+  }
+}
+
 void gameoverDisplay () {
   if (isEarth) {
     setColor(CYAN);
@@ -508,6 +542,7 @@ void displayHandler() {
     case SINGLEPLAYER:
     case MULTIPLAYER:
       inGameDisplay();
+      commsDebugDisplay();
       break;
     case GAMEOVER:
       gameoverDisplay();

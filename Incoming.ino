@@ -6,7 +6,8 @@
 
 /*
  *  KNOWN ISSUES:
- *  - Blink gets locked in waiting for MISSILE if original request fails, won't initiate new requests
+ *  - Earth repeatedly sending missiles at cooldown rate once requested
+ *  - original requester blink exploding with each received missile until passes a new request
  */
 
 /*
@@ -35,7 +36,7 @@
 // Game Balance
 #define ASTEROIDTRANSITTIMEMS 350
 #define MISSILETRANSITTIMEMS 250
-#define MISSILECOOLDOWNTIMEMS 500
+#define MISSILECOOLDOWNTIMEMS 750
 #define EXPLOSIONTIMEMS 500
 
 // General presets
@@ -67,7 +68,7 @@ byte fasteroidType = NOTHING;
 bool hasMissile = false;
 bool missileRequested = false;
 int missileRequestFace = -1;
-int missileRequestedFace = -1;
+byte requestQueue[6] = {7,7,7,7,7,7}; // 7 for none, keeps the array smaller and no chance of confusion with faces
 bool isExploding = false;
 
 // Projectile Timers
@@ -95,6 +96,7 @@ Timer animationTimer;
 void setup() {
   randomize(); //Seed RNG
   animationTimer.set(ANIMATIONTIMERMS);
+  missileCooldownTimer.set(MISSILECOOLDOWNTIMEMS);
 }
 
 void loop() {
@@ -226,16 +228,26 @@ void checkStartGame () {
   }
 }
 
+
 // Check and handle expired projectile timers
 void projectileTimerHandler () {
 
   // Handle Missiles
   if (hasMissile && missileTimer.isExpired()) {
-    if (!missileRequested) {
-      sendProjectileOnFace(MISSILE,missileRequestedFace);
+    if (!missileRequested && requestQueue[0] != 7) {
+      sendProjectileOnFace(MISSILE,getNextRequest());
     }
     else {
       startExplosion();
+    }
+  }
+
+  // Handle Earth's Missile Cooldown and Queue
+  if (isEarth) {
+    //processRequestQueue();
+    if ((requestQueue[0] != 7) && (missileCooldownTimer.isExpired())) {
+      sendProjectileOnFace(MISSILE,getNextRequest());
+      missileCooldownTimer.set(MISSILECOOLDOWNTIMEMS);
     }
   }
 
@@ -244,6 +256,7 @@ void projectileTimerHandler () {
     isExploding = false;
   }
 }
+
 
 void startExplosion () {
   missileRequested = false;
@@ -391,6 +404,7 @@ void incomingCommsHandler() {
 void ACKHandler (int face) {
   if ((ACKReceive[face] == 1) && (outgoingProjectiles[face] != NOTHING)) {
     outgoingProjectiles[face] = NOTHING;
+    processBufferOnFace(face);
   }
 }
 
@@ -424,12 +438,16 @@ void projectileManager () {
         case MISSILE:
           if (tempDirection == OUTWARD) { // Missile request received! Pass on immediately inward if not Earth.
             if (!isEarth) {
-              missileRequestedFace = f;
+              addMissileRequest(f);
               sendProjectileOnFace(MISSILE, missileRequestFace);
             }
             else if (missileCooldownTimer.isExpired()) { // If Earth and cooldown expired, bounce the request back.
-              sendProjectileOnFace(MISSILE, f);
+              addMissileRequest(f);
+              sendProjectileOnFace(MISSILE, getNextRequest());
               missileCooldownTimer.set(MISSILECOOLDOWNTIMEMS);
+            }
+            else { // If Earth and cooldown was running, add to request queue
+               addMissileRequest(f);
             }
           }
           else { // Actual missile received!
@@ -449,6 +467,41 @@ void gained (byte proj) {
       missileTimer.set(MISSILETRANSITTIMEMS);
       break;
   }
+}
+
+void addMissileRequest (byte src) {
+  FOREACH_FACE(f) {
+    if (requestQueue[f] == 7) {
+      requestQueue[f] = src;
+      break;
+    }
+  }
+}
+
+byte getNextRequest () {
+//  byte next = 7;
+//  FOREACH_FACE(f) {
+//    if (requestQueue[f] != 7){
+//      next = requestQueue[f];
+//      break;
+//    }
+//  }
+  byte next = requestQueue[0];
+  processRequestQueue();
+  return next;
+}
+
+void processRequestQueue () {
+  FOREACH_FACE(f) {
+    byte nextPos = f+1;
+    if ((f < 5) && (requestQueue[f] == 7) && (requestQueue[nextPos] != 7)) {
+      requestQueue[f] = requestQueue[nextPos];
+      requestQueue[nextPos] = 7;
+    }
+  }
+//  if (requestQueue[0] == 7) {
+//    processRequestQueue();
+//  }
 }
 
 void sendProjectileOnFace (byte proj, int face) {
@@ -511,17 +564,12 @@ void inGameDisplay () {
 
 void renderMissile (){
   if (hasMissile) {
-//    FOREACH_FACE(f) {
-//      if ((outgoingProjectiles[f] == MISSILE) || (incomingProjectiles[f] == MISSILE) || (receivedProjectiles[f] == MISSILE)) {
-//        setColorOnFace (MISSILECOLOR, f);
-//      }
-//    }
     if (!missileRequested) {
       if (missileTimer.getRemaining() >= (MISSILETRANSITTIMEMS / 2)) {
         setColorOnFace(MISSILECOLOR, missileRequestFace);
       }
       else {
-        setColorOnFace(MISSILECOLOR, missileRequestedFace);
+        setColorOnFace(MISSILECOLOR, requestQueue[0]);
       }
     }
     else {
@@ -572,7 +620,7 @@ void displayHandler() {
     case SINGLEPLAYER:
     case MULTIPLAYER:
       inGameDisplay();
-      //commsDebugDisplay();
+      commsDebugDisplay();
       break;
     case GAMEOVER:
       gameoverDisplay();

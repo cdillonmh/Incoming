@@ -11,7 +11,6 @@
 
 /*
  *  NEXT STEPS:
- *  - Animate MISSILE after sent and in transit (Utilize existing projectile code, as per debug?)
  *  - Create reset function to clear out game variables when game over
  */
 
@@ -35,7 +34,7 @@
 
 // Game Balance
 #define ASTEROIDTRANSITTIMEMS 350
-#define MISSILETRANSITTIMEMS 100
+#define MISSILETRANSITTIMEMS 250
 #define MISSILECOOLDOWNTIMEMS 500
 #define EXPLOSIONTIMEMS 500
 
@@ -500,11 +499,42 @@ void inGameDisplay () {
     }
   }
   else {
-  setColor (SPACECOLOR);
+    setColor (SPACECOLOR);
   }
+
+  renderMissile();
 
   if (isExploding) {
     setColor (ORANGE);
+  }
+}
+
+void renderMissile (){
+  if (hasMissile) {
+//    FOREACH_FACE(f) {
+//      if ((outgoingProjectiles[f] == MISSILE) || (incomingProjectiles[f] == MISSILE) || (receivedProjectiles[f] == MISSILE)) {
+//        setColorOnFace (MISSILECOLOR, f);
+//      }
+//    }
+    if (!missileRequested) {
+      if (missileTimer.getRemaining() >= (MISSILETRANSITTIMEMS / 2)) {
+        setColorOnFace(MISSILECOLOR, missileRequestFace);
+      }
+      else {
+        setColorOnFace(MISSILECOLOR, missileRequestedFace);
+      }
+    }
+    else {
+      setColorOnFace(MISSILECOLOR, missileRequestFace);
+    }
+  }
+
+  if (missileRequested) {
+    FOREACH_FACE (f) {
+      if (f%2 > 0) {
+        setColorOnFace(MISSILECOLOR, f);
+      }
+    }
   }
 }
 
@@ -542,7 +572,7 @@ void displayHandler() {
     case SINGLEPLAYER:
     case MULTIPLAYER:
       inGameDisplay();
-      commsDebugDisplay();
+      //commsDebugDisplay();
       break;
     case GAMEOVER:
       gameoverDisplay();

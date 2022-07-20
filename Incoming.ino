@@ -6,8 +6,7 @@
 
 /*
  *  KNOWN ISSUES:
- *  - Earth repeatedly sending missiles at cooldown rate once requested
- *  - original requester blink exploding with each received missile until passes a new request
+ *  - Missile request collisions result in stuck request
  */
 
 /*
@@ -483,10 +482,12 @@ byte getNextRequest () {
 //  FOREACH_FACE(f) {
 //    if (requestQueue[f] != 7){
 //      next = requestQueue[f];
+//      requestQueue[0] = 7;
 //      break;
 //    }
 //  }
   byte next = requestQueue[0];
+  requestQueue[0] = 7;
   processRequestQueue();
   return next;
 }

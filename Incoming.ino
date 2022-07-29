@@ -35,7 +35,7 @@
 // Game Balance
 #define ASTEROIDTRANSITTIMEMS 350
 #define MISSILETRANSITTIMEMS 250
-#define MISSILECOOLDOWNTIMEMS 750
+#define MISSILECOOLDOWNTIMEMS 1000
 #define EXPLOSIONTIMEMS 500
 
 // General presets
@@ -115,6 +115,7 @@ void loop() {
       break;
   }
 
+  processAllFaceBuffers();
   incomingCommsHandler();
   projectileReceiver();
   projectileManager();
@@ -403,7 +404,6 @@ void incomingCommsHandler() {
 void ACKHandler (int face) {
   if ((ACKReceive[face] == 1) && (outgoingProjectiles[face] != NOTHING)) {
     outgoingProjectiles[face] = NOTHING;
-    processBufferOnFace(face);
   }
 }
 
@@ -506,7 +506,6 @@ void processRequestQueue () {
 }
 
 void sendProjectileOnFace (byte proj, int face) {
-  processBufferOnFace(face);
   if (outgoingProjectiles[face] == NOTHING) {
     outgoingProjectiles[face] = proj;
     clearSentProjectile(proj);
@@ -532,11 +531,21 @@ void processBufferOnFace (int f) {
   }
 }
 
+void processAllFaceBuffers() {
+  FOREACH_FACE(f) {
+    if (isValueReceivedOnFaceExpired(f)) continue; //Skip open faces
+
+    if (parseACKState(getLastValueReceivedOnFace(f)) == 0) {
+      processBufferOnFace(f);
+    }
+  }
+}
+
 void outgoingCommsHandler() {
 
   FOREACH_FACE(f) {
     if (isValueReceivedOnFaceExpired(f)) continue; //Skip open faces
-
+    
     setValueSentOnFace((gameState << 6) + (blinkState << 4) + (outgoingProjectiles[f] << 1) + ACKSend[f], f);
   }
 }
@@ -597,6 +606,9 @@ void commsDebugDisplay () {
     }
     else if (ACKSend[f] == 1) {
       setColorOnFace (YELLOW, f);
+    }
+      if (projectilesBuffer[f] == MISSILE) {
+      setColorOnFace (RED, f);
     }
   }
 }

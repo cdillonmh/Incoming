@@ -6,7 +6,6 @@
 
 /*
  *  KNOWN ISSUES:
- *  - Possible to overrun Earth request queue causing lost requests.
  *  - Occasional missile request collisions causing lost requests.
  */
 
@@ -42,7 +41,7 @@
 
 // General presets
 #define ANIMATIONTIMERMS 1000
-#define REQUESTQUEUESIZE 12
+#define REQUESTQUEUESIZE 24
 //#define PROJECTILETIMEOUTTIMERMS 200
 
 // Game States

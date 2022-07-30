@@ -11,8 +11,7 @@
 
 /*
  *  NEXT STEPS:
- *  - Re-request missile if not receieved after a long time?
- *  - Create reset function to clear out game variables when game over
+ *  - Implement missile request and comms expiration timers
  */
 
 /* 
@@ -102,9 +101,7 @@ void setup() {
   
   // Seed request queue with empty value
   requestQueueEmptyValue = REQUESTQUEUESIZE + 1;
-  for (int i; i<=(REQUESTQUEUESIZE-1); i++) {
-    requestQueue[i] = requestQueueEmptyValue;
-  }
+  clearRequestQueue();
 }
 
 void loop() {
@@ -120,6 +117,7 @@ void loop() {
       tempCheckEndGame();
       break;
     case GAMEOVER:
+      resetAll();
       checkResetGame();
       break;
   }
@@ -293,6 +291,51 @@ void tempCheckEndGame () {
 void checkResetGame () {
   if (buttonSingleClicked() && isEarth && !hasWoken()) {
     gameState = SETUP;
+  }
+}
+
+void clearRequestQueue () {
+  for (int i; i<=(REQUESTQUEUESIZE-1); i++) {
+    requestQueue[i] = requestQueueEmptyValue;
+  }
+}
+
+void clearProjectileArray (byte target[]) {
+  FOREACH_FACE(f) {
+    target[f] = NOTHING;
+  }
+}
+
+void clearACKArray (byte target[]) {
+  FOREACH_FACE(f) {
+    target[f] = 0;
+  }
+}
+
+// Clear variables and arrays to reset for next game
+void resetAll () {
+  if (missileRequestFace != -1) {
+    // Projectiles
+    clearProjectileArray(incomingProjectiles);
+    clearProjectileArray(receivedProjectiles);
+    clearACKArray(ACKReceive);
+    clearProjectileArray(outgoingProjectiles);
+    clearProjectileArray(projectilesBuffer);
+    clearACKArray(ACKSend);
+    asteroidType = NOTHING;
+    fasteroidType = NOTHING;
+    hasMissile = false;
+    missileRequested = false;
+    missileRequestFace = -1;
+    clearRequestQueue();
+    isExploding = false;
+  
+    // Projectile Timers
+    asteroidTimer.set(0);
+    fasteroidTimer.set(0);
+    missileTimer.set(0);
+    missileCooldownTimer.set(0);
+    explosionTimer.set(0);
   }
 }
 

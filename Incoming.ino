@@ -6,11 +6,13 @@
 
 /*
  *  KNOWN ISSUES:
- *  - Missile request collisions result in stuck request
+ *  - Possible to overrun Earth request queue causing lost requests.
+ *  - Occasional missile request collisions causing lost requests.
  */
 
 /*
  *  NEXT STEPS:
+ *  - Re-request missile if not receieved after a long time?
  *  - Create reset function to clear out game variables when game over
  */
 
@@ -40,6 +42,7 @@
 
 // General presets
 #define ANIMATIONTIMERMS 1000
+#define REQUESTQUEUESIZE 12
 //#define PROJECTILETIMEOUTTIMERMS 200
 
 // Game States
@@ -67,7 +70,8 @@ byte fasteroidType = NOTHING;
 bool hasMissile = false;
 bool missileRequested = false;
 int missileRequestFace = -1;
-byte requestQueue[6] = {7,7,7,7,7,7}; // 7 for none, keeps the array smaller and no chance of confusion with faces
+byte requestQueue[REQUESTQUEUESIZE];
+byte requestQueueEmptyValue;
 bool isExploding = false;
 
 // Projectile Timers
@@ -96,6 +100,12 @@ void setup() {
   randomize(); //Seed RNG
   animationTimer.set(ANIMATIONTIMERMS);
   missileCooldownTimer.set(MISSILECOOLDOWNTIMEMS);
+  
+  // Seed request queue with empty value
+  requestQueueEmptyValue = REQUESTQUEUESIZE + 1;
+  for (int i; i<=(REQUESTQUEUESIZE-1); i++) {
+    requestQueue[i] = requestQueueEmptyValue;
+  }
 }
 
 void loop() {
@@ -234,7 +244,7 @@ void projectileTimerHandler () {
 
   // Handle Missiles
   if (hasMissile && missileTimer.isExpired()) {
-    if (!missileRequested && requestQueue[0] != 7) {
+    if (!missileRequested && requestQueue[0] != requestQueueEmptyValue) {
       sendProjectileOnFace(MISSILE,getNextRequest());
     }
     else {
@@ -245,7 +255,7 @@ void projectileTimerHandler () {
   // Handle Earth's Missile Cooldown and Queue
   if (isEarth) {
     //processRequestQueue();
-    if ((requestQueue[0] != 7) && (missileCooldownTimer.isExpired())) {
+    if ((requestQueue[0] != requestQueueEmptyValue) && (missileCooldownTimer.isExpired())) {
       sendProjectileOnFace(MISSILE,getNextRequest());
       missileCooldownTimer.set(MISSILECOOLDOWNTIMEMS);
     }
@@ -469,8 +479,8 @@ void gained (byte proj) {
 }
 
 void addMissileRequest (byte src) {
-  FOREACH_FACE(f) {
-    if (requestQueue[f] == 7) {
+  for (int f = 0; f<=(REQUESTQUEUESIZE-1); f++) {
+    if (requestQueue[f] == requestQueueEmptyValue) {
       requestQueue[f] = src;
       break;
     }
@@ -487,22 +497,19 @@ byte getNextRequest () {
 //    }
 //  }
   byte next = requestQueue[0];
-  requestQueue[0] = 7;
+  requestQueue[0] = requestQueueEmptyValue;
   processRequestQueue();
   return next;
 }
 
 void processRequestQueue () {
-  FOREACH_FACE(f) {
-    byte nextPos = f+1;
-    if ((f < 5) && (requestQueue[f] == 7) && (requestQueue[nextPos] != 7)) {
+  for (int f = 0; f<=(REQUESTQUEUESIZE-2); f++) {
+    int nextPos = f+1;
+    if ((requestQueue[f] == requestQueueEmptyValue) && (requestQueue[nextPos] != requestQueueEmptyValue)) {
       requestQueue[f] = requestQueue[nextPos];
-      requestQueue[nextPos] = 7;
+      requestQueue[nextPos] = requestQueueEmptyValue;
     }
   }
-//  if (requestQueue[0] == 7) {
-//    processRequestQueue();
-//  }
 }
 
 void sendProjectileOnFace (byte proj, int face) {
@@ -532,6 +539,7 @@ void processBufferOnFace (int f) {
 }
 
 void processAllFaceBuffers() {
+  
   FOREACH_FACE(f) {
     if (isValueReceivedOnFaceExpired(f)) continue; //Skip open faces
 
@@ -607,8 +615,11 @@ void commsDebugDisplay () {
     else if (ACKSend[f] == 1) {
       setColorOnFace (YELLOW, f);
     }
-      if (projectilesBuffer[f] == MISSILE) {
+    if (projectilesBuffer[f] == MISSILE) {
       setColorOnFace (RED, f);
+    }
+    if (requestQueue[0] == f){
+      setColorOnFace (GREEN, f);
     }
   }
 }

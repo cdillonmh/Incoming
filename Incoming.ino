@@ -6,12 +6,13 @@
 
 /*
  *  KNOWN ISSUES:
- *  - Occasional missile request collisions causing lost requests
+ *  - Occasional missile request collisions causing lost requests (Comms timeout timers helping)
  */
 
 /*
  *  NEXT STEPS:
- *  - Implement missile request and comms expiration timers
+ *  - Asteroid spawing!
+ *  
  */
 
 /* 
@@ -40,8 +41,9 @@
 
 // General presets
 #define ANIMATIONTIMERMS 1000
-#define REQUESTQUEUESIZE 18
-//#define PROJECTILETIMEOUTTIMERMS 200
+#define REQUESTQUEUESIZE 12
+#define REQUESTTIMEOUTTIMERMS 7500
+#define COMMSTIMEOUTTIMERMS 7000
 
 // Game States
 enum gameStates {SETUP, SINGLEPLAYER, MULTIPLAYER, GAMEOVER};
@@ -78,6 +80,8 @@ Timer fasteroidTimer;
 Timer missileTimer;
 Timer missileCooldownTimer;
 Timer explosionTimer;
+Timer requestTimeoutTimer;
+Timer commsTimeoutTimer;
 
 /*
  * BITWISE FACE COMMS
@@ -249,6 +253,19 @@ void projectileTimerHandler () {
     }
   }
 
+  // Handle Comms Timeouts
+  if ((requestQueue[0] != requestQueueEmptyValue) && commsTimeoutTimer.isExpired()) {
+    getNextRequest(); // Clear out oldest request
+    if (requestQueue[0] != requestQueueEmptyValue) {
+      commsTimeoutTimer.set(COMMSTIMEOUTTIMERMS);
+    }
+  }
+
+  // Handle Request Timeouts
+  if (missileRequested && requestTimeoutTimer.isExpired()) {
+    missileRequested = false; // Clear out missile request
+  }
+
   // Handle Earth's Missile Cooldown and Queue
   if (isEarth) {
     //processRequestQueue();
@@ -277,6 +294,7 @@ void inputHandler () {
   if (buttonSingleClicked() && !isEarth && !hasWoken() && !missileRequested) {
     missileRequested = true;
     sendProjectileOnFace(MISSILE, missileRequestFace);
+    requestTimeoutTimer.set(REQUESTTIMEOUTTIMERMS);
   }
 }
 
@@ -501,10 +519,10 @@ void projectileManager () {
                addMissileRequest(f);
             }
           }
-          else { // Actual missile received!
+          else if (missileRequested || (requestQueue[0] != requestQueueEmptyValue)){ // Actual missile received and we know what to do with it!
             gained(MISSILE);
           }
-          break;          
+          break;
       }
       receivedProjectiles[f] = NOTHING; // Projectile handled, clear from receiving array.
     }
@@ -524,6 +542,7 @@ void addMissileRequest (byte src) {
   for (int f = 0; f<=(REQUESTQUEUESIZE-1); f++) {
     if (requestQueue[f] == requestQueueEmptyValue) {
       requestQueue[f] = src;
+      commsTimeoutTimer.set(COMMSTIMEOUTTIMERMS);
       break;
     }
   }
@@ -541,6 +560,12 @@ byte getNextRequest () {
   byte next = requestQueue[0];
   requestQueue[0] = requestQueueEmptyValue;
   processRequestQueue();
+  if (requestQueue[0] != requestQueueEmptyValue) {
+    commsTimeoutTimer.set(COMMSTIMEOUTTIMERMS);
+  }
+  else {
+    commsTimeoutTimer.set(0);
+  }
   return next;
 }
 

@@ -11,7 +11,7 @@
 
 /*
  *  NEXT STEPS:
- *  - Asteroid spawing!
+ *  - Asteroid spawning!
  *  
  */
 
@@ -32,6 +32,7 @@
 #define MISSILECOLOR WHITE
 #define EXPLOSIONCOLOR ORANGE
 #define DAMAGECOLOR RED
+#define SPAWNERCOLOR CYAN
 
 // Game Balance
 #define ASTEROIDTRANSITTIMEMS 350
@@ -54,6 +55,7 @@ byte cached_gameState[FACE_COUNT];
 enum blinkStates {L0, L1, L2, L3};
 byte blinkState = L0;
 bool isEarth = false;
+bool isSpawner = false;
 
 // Projectile Types
 enum projectiles {NOTHING, AST4, AST3, AST2, AST1, FAST2, FAST1, MISSILE};
@@ -139,19 +141,28 @@ void loop() {
 // Figure out layer position based on relative position to edge
 void checkBlinkState (){
   bool hasEdge = false;
+  byte numEdges = 0;
   FOREACH_FACE(f) {
     if (isValueReceivedOnFaceExpired(f)) {
       // Found an open edge!
       hasEdge = true;
+      numEdges++;
     }
   }
   if (hasEdge) {
     blinkState = L0;
+    if (numEdges > 3) {
+      isSpawner = true;
+    }
+    else {
+      isSpawner = false;
+    }
   }
   else {
     byte lowestAdjacentLayer = getBlinkStateOnFace(0);
     byte lastFaceValue = lowestAdjacentLayer;
     bool allTheSame = true;
+    isSpawner = false;
     FOREACH_FACE(f) {
       byte faceState = getBlinkStateOnFace(f);
       if (faceState < lowestAdjacentLayer) {
@@ -214,16 +225,28 @@ void determineDirectionality () {
   }
 
   // Find forwards and backwards
+  
   FOREACH_FACE(f) {
     byte currentFace = f;
     byte nextFace = ((f+1)%6);
-    if (faceDirection[currentFace] == UNDETERMINED) {
-      if (faceDirection[nextFace] == INWARD) {
-        faceDirection[currentFace] = FORWARD;
-        missileRequestFace = nextFace;
+    if (!isSpawner) {
+      if (faceDirection[currentFace] == UNDETERMINED) {
+        if (faceDirection[nextFace] == INWARD) {
+          faceDirection[currentFace] = FORWARD;
+          missileRequestFace = nextFace;
+        }
+        else {
+          faceDirection[currentFace] = BACKWARD;
+        }
       }
-      else {
-        faceDirection[currentFace] = BACKWARD;
+    }
+    else {
+      if (faceDirection[currentFace] == EDGE && faceDirection[nextFace] != EDGE) {
+        faceDirection[nextFace] = INWARD;
+        missileRequestFace = nextFace;
+        if (faceDirection[(nextFace+1)%6] != EDGE){
+          faceDirection[(nextFace+1)%6] = INWARD;
+        }
       }
     }
   }
@@ -347,6 +370,7 @@ void resetAll () {
     missileRequestFace = -1;
     clearRequestQueue();
     isExploding = false;
+    isSpawner = false;
   
     // Projectile Timers
     asteroidTimer.set(0);
@@ -360,7 +384,12 @@ void resetAll () {
 void layerTestDisplay (){
   switch (blinkState) {
     case L0:
-      setColor(WHITE);
+      if (isSpawner) {
+        setColor(SPAWNERCOLOR);
+      }
+      else {
+        setColor(WHITE);
+      }
       break;
     case L1:
       setColor(YELLOW);
@@ -505,7 +534,7 @@ void projectileManager () {
       
       switch (tempProjectile) {
         case MISSILE:
-          if (tempDirection == OUTWARD) { // Missile request received! Pass on immediately inward if not Earth.
+          if (tempDirection != INWARD) { // Missile request received! Pass on immediately inward if not Earth.
             if (!isEarth) {
               addMissileRequest(f);
               sendProjectileOnFace(MISSILE, missileRequestFace);
@@ -549,14 +578,6 @@ void addMissileRequest (byte src) {
 }
 
 byte getNextRequest () {
-//  byte next = 7;
-//  FOREACH_FACE(f) {
-//    if (requestQueue[f] != 7){
-//      next = requestQueue[f];
-//      requestQueue[0] = 7;
-//      break;
-//    }
-//  }
   byte next = requestQueue[0];
   requestQueue[0] = requestQueueEmptyValue;
   processRequestQueue();
@@ -637,7 +658,12 @@ void inGameDisplay () {
     }
   }
   else {
-    setColor (SPACECOLOR);
+    if (isSpawner && gameState == MULTIPLAYER) {
+      setColor (SPAWNERCOLOR);
+    }
+    else {
+      setColor (SPACECOLOR);
+    }
   }
 
   renderMissile();
@@ -711,7 +737,7 @@ void displayHandler() {
     case SINGLEPLAYER:
     case MULTIPLAYER:
       inGameDisplay();
-      commsDebugDisplay();
+      //commsDebugDisplay();
       break;
     case GAMEOVER:
       gameoverDisplay();

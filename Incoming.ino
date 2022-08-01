@@ -59,7 +59,7 @@ bool isEarth = false;
 bool isSpawner = false;
 
 // Projectile Types
-enum projectiles {NOTHING, AST4, AST3, AST2, AST1, FAST2, FAST1, MISSILE};
+enum projectiles {NOTHING, ASTFOUR, ASTTHREE, ASTTWO, ASTONE, FASTTWO, FASTONE, MISSILE};
 
 // Projectile Handling
 byte incomingProjectiles[] = {NOTHING, NOTHING, NOTHING, NOTHING, NOTHING, NOTHING};
@@ -270,17 +270,17 @@ void projectileTimerHandler () {
   // Handle Asteroids
   if (asteroidType != NOTHING && asteroidTimer.isExpired()) {
     switch (asteroidType) {
-      case AST1:
-        sendProjectileOnFace(AST4,missileRequestFace);
+      case ASTONE:
+        sendProjectileOnFace(ASTFOUR,missileRequestFace);
         break;
-      case AST2:
-        sendProjectileOnFace(AST1,(missileRequestFace+5)%6);
+      case ASTTWO:
+        sendProjectileOnFace(ASTONE,(missileRequestFace+5)%6);
         break;
-      case AST3:
-        sendProjectileOnFace(AST2,(missileRequestFace+5)%6);
+      case ASTTHREE:
+        sendProjectileOnFace(ASTTWO,(missileRequestFace+5)%6);
         break;
-      case AST4:
-        sendProjectileOnFace(AST3,(missileRequestFace+5)%6);
+      case ASTFOUR:
+        sendProjectileOnFace(ASTTHREE,(missileRequestFace+5)%6);
         break;
     }
   }
@@ -288,11 +288,11 @@ void projectileTimerHandler () {
     // Handle Fasteroids
   if (fasteroidType != NOTHING && fasteroidTimer.isExpired()) {
     switch (fasteroidType) {
-      case FAST1:
-        sendProjectileOnFace(FAST2,missileRequestFace);
+      case FASTONE:
+        sendProjectileOnFace(FASTTWO,missileRequestFace);
         break;
-      case FAST2:
-        sendProjectileOnFace(FAST1,(missileRequestFace+5)%6);
+      case FASTTWO:
+        sendProjectileOnFace(FASTONE,(missileRequestFace+5)%6);
         break;
     }
   }
@@ -347,7 +347,7 @@ void startExplosion () {
 void inputHandler () {
   if (buttonSingleClicked() && !isEarth && !hasWoken() && !missileRequested) {
     if (gameState == MULTIPLAYER && isSpawner) {
-      gained(AST1);
+      gained(ASTONE);
     }
     else {
       missileRequested = true;
@@ -357,7 +357,7 @@ void inputHandler () {
   }
 
   if (buttonDoubleClicked() && !isEarth && !hasWoken() && gameState == MULTIPLAYER && isSpawner) {
-    gained(FAST1);
+    gained(FASTONE);
   }
 }
 
@@ -597,12 +597,12 @@ void projectileManager () {
             gained(MISSILE);
           }
           break;
-        case AST1:
-        case AST2:
-        case AST3:
-        case AST4:
-        case FAST1:
-        case FAST2:
+        case ASTONE:
+        case ASTTWO:
+        case ASTTHREE:
+        case ASTFOUR:
+        case FASTONE:
+        case FASTTWO:
           gained (tempProjectile);
           break;
       }
@@ -617,20 +617,20 @@ void gained (byte proj) {
       hasMissile = true;
       missileTimer.set(MISSILETRANSITTIMEMS);
       break;
-    case AST1:
-      asteroidType = AST1;
-    case AST2:
-      asteroidType = AST2;
-    case AST3:
-      asteroidType = AST3;
-    case AST4:
-      asteroidType = AST4;
+    case ASTONE:
+      asteroidType = ASTONE;
+    case ASTTWO:
+      asteroidType = ASTTWO;
+    case ASTTHREE:
+      asteroidType = ASTTHREE;
+    case ASTFOUR:
+      asteroidType = ASTFOUR;
       asteroidTimer.set(ASTEROIDTRANSITTIMEMS);
     break;
-    case FAST1:
-      fasteroidType = FAST1;
-    case FAST2:
-      fasteroidType = FAST2;
+    case FASTONE:
+      fasteroidType = FASTONE;
+    case FASTTWO:
+      fasteroidType = FASTTWO;
       fasteroidTimer.set(FASTEROIDTRANSITTIMEMS);
     break;
   }
@@ -685,14 +685,14 @@ void clearSentProjectile (byte proj) {
     case MISSILE:
       hasMissile = false;
       break;
-    case AST1:
-    case AST2:
-    case AST3:
-    case AST4:
+    case ASTONE:
+    case ASTTWO:
+    case ASTTHREE:
+    case ASTFOUR:
       asteroidType = NOTHING;
       break;
-    case FAST1:
-    case FAST2:
+    case FASTONE:
+    case FASTTWO:
       fasteroidType = NOTHING;
       break;
   }
@@ -758,24 +758,24 @@ void inGameDisplay () {
 void renderAsteroids (bool debug) {
   if (debug) {
     switch (asteroidType) {
-      case AST1:
+      case ASTONE:
         setColor (RED);
         break;
-      case AST2:
+      case ASTTWO:
         setColor (ORANGE);
         break;
-      case AST3:
+      case ASTTHREE:
         setColor (YELLOW);
         break;
-      case AST4:
+      case ASTFOUR:
         setColor (WHITE);
         break;
     }
       switch (fasteroidType) {
-      case FAST1:
+      case FASTONE:
         setColor (BLUE);
         break;
-      case FAST2:
+      case FASTTWO:
         setColor (GREEN);
         break;
     }

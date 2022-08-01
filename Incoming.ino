@@ -7,12 +7,14 @@
 /*
  *  KNOWN ISSUES:
  *  - Occasional missile request collisions causing lost requests (Comms timeout timers helping)
+ *  - Asteroids can collide and cause lost comms (not a big issue, really)
  */
 
 /*
  *  NEXT STEPS:
- *  - Asteroid spawning!
- *  
+ *  - Explosions destroy asteroids
+ *  - Asteroids damage Earth
+ *  - Improve asteroid transit animation
  */
 
 /* 
@@ -40,6 +42,9 @@
 #define MISSILETRANSITTIMEMS 250
 #define MISSILECOOLDOWNTIMEMS 1000
 #define EXPLOSIONTIMEMS 500
+#define EARTHFULLHEALTH 6
+#define ASTEROIDDAMAGE 1
+#define FASTEROIDDAMAGE 1
 
 // General presets
 #define ANIMATIONTIMERMS 1000
@@ -76,6 +81,7 @@ int missileRequestFace = -1;
 byte requestQueue[REQUESTQUEUESIZE];
 byte requestQueueEmptyValue;
 bool isExploding = false;
+int earthHealth = EARTHFULLHEALTH;
 
 // Projectile Timers
 Timer asteroidTimer;
@@ -119,6 +125,7 @@ void loop() {
       break;
     case SINGLEPLAYER:
     case MULTIPLAYER:
+      checkGameplayCollissions();
       projectileTimerHandler();
       inputHandler();
       tempCheckEndGame();
@@ -343,6 +350,29 @@ void startExplosion () {
   explosionTimer.set(EXPLOSIONTIMEMS);
 }
 
+// Check for destroyed asteroids or damage to Earth
+void checkGameplayCollissions () {
+  if (!isEarth) {
+    if (isExploding && (asteroidType != NOTHING || fasteroidType != NOTHING)){
+      asteroidType = NOTHING;
+      fasteroidType = NOTHING;
+    }
+  }
+  else if (asteroidType != NOTHING || fasteroidType != NOTHING) {
+    if (asteroidType != NOTHING) {
+      earthHealth = earthHealth - ASTEROIDDAMAGE;
+      asteroidType = NOTHING;
+    }
+    if (fasteroidType != NOTHING) {
+      earthHealth = earthHealth - FASTEROIDDAMAGE;
+      fasteroidType = NOTHING;
+    }
+    if (earthHealth < 1) {
+      gameState = GAMEOVER;
+    }
+  }
+}
+
 // Look for and interpret inputs during gameplay
 void inputHandler () {
   if (buttonSingleClicked() && !isEarth && !hasWoken() && !missileRequested) {
@@ -411,7 +441,8 @@ void resetAll () {
     clearRequestQueue();
     isExploding = false;
     isSpawner = false;
-  
+    earthHealth = EARTHFULLHEALTH;
+
     // Projectile Timers
     asteroidTimer.set(0);
     fasteroidTimer.set(0);
@@ -751,7 +782,7 @@ void inGameDisplay () {
       setColor (SPACECOLOR);
     }
     
-  renderAsteroids(true);
+  renderAsteroids(false);
     
   }
 
@@ -856,12 +887,12 @@ void displayHandler() {
   switch (gameState) {
     case SETUP: 
       layerTestDisplay(); // Verifies layer functionality
-      directionalityTestDisplay(); // Verifies directionality functionality
+      //directionalityTestDisplay(); // Verifies directionality functionality
       break;
     case SINGLEPLAYER:
     case MULTIPLAYER:
       inGameDisplay();
-      commsDebugDisplay();
+      //commsDebugDisplay();
       break;
     case GAMEOVER:
       gameoverDisplay();

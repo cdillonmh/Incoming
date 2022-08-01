@@ -36,6 +36,7 @@
 
 // Game Balance
 #define ASTEROIDTRANSITTIMEMS 350
+#define FASTEROIDTRANSITTIMEMS 350
 #define MISSILETRANSITTIMEMS 250
 #define MISSILECOOLDOWNTIMEMS 1000
 #define EXPLOSIONTIMEMS 500
@@ -266,6 +267,36 @@ void checkStartGame () {
 // Check and handle expired projectile timers
 void projectileTimerHandler () {
 
+  // Handle Asteroids
+  if (asteroidType != NOTHING && asteroidTimer.isExpired()) {
+    switch (asteroidType) {
+      case AST1:
+        sendProjectileOnFace(AST4,missileRequestFace);
+        break;
+      case AST2:
+        sendProjectileOnFace(AST1,(missileRequestFace+5)%6);
+        break;
+      case AST3:
+        sendProjectileOnFace(AST2,(missileRequestFace+5)%6);
+        break;
+      case AST4:
+        sendProjectileOnFace(AST3,(missileRequestFace+5)%6);
+        break;
+    }
+  }
+
+    // Handle Fasteroids
+  if (fasteroidType != NOTHING && fasteroidTimer.isExpired()) {
+    switch (fasteroidType) {
+      case FAST1:
+        sendProjectileOnFace(FAST2,missileRequestFace);
+        break;
+      case FAST2:
+        sendProjectileOnFace(FAST1,(missileRequestFace+5)%6);
+        break;
+    }
+  }
+
   // Handle Missiles
   if (hasMissile && missileTimer.isExpired()) {
     if (!missileRequested && requestQueue[0] != requestQueueEmptyValue) {
@@ -315,9 +346,18 @@ void startExplosion () {
 // Look for and interpret inputs during gameplay
 void inputHandler () {
   if (buttonSingleClicked() && !isEarth && !hasWoken() && !missileRequested) {
-    missileRequested = true;
-    sendProjectileOnFace(MISSILE, missileRequestFace);
-    requestTimeoutTimer.set(REQUESTTIMEOUTTIMERMS);
+    if (gameState == MULTIPLAYER && isSpawner) {
+      gained(AST1);
+    }
+    else {
+      missileRequested = true;
+      sendProjectileOnFace(MISSILE, missileRequestFace);
+      requestTimeoutTimer.set(REQUESTTIMEOUTTIMERMS);
+    }
+  }
+
+  if (buttonDoubleClicked() && !isEarth && !hasWoken() && gameState == MULTIPLAYER && isSpawner) {
+    gained(FAST1);
   }
 }
 
@@ -378,6 +418,8 @@ void resetAll () {
     missileTimer.set(0);
     missileCooldownTimer.set(0);
     explosionTimer.set(0);
+    requestTimeoutTimer.set(0);
+    commsTimeoutTimer.set(0);
   }
 }
 
@@ -425,6 +467,9 @@ void directionalityTestDisplay (){
       case UNDETERMINED:
         setColorOnFace(OFF, f);
         break;
+    }
+    if (f == missileRequestFace) {
+      setColorOnFace(MAGENTA, f);
     }
   }
 }
@@ -552,6 +597,14 @@ void projectileManager () {
             gained(MISSILE);
           }
           break;
+        case AST1:
+        case AST2:
+        case AST3:
+        case AST4:
+        case FAST1:
+        case FAST2:
+          gained (tempProjectile);
+          break;
       }
       receivedProjectiles[f] = NOTHING; // Projectile handled, clear from receiving array.
     }
@@ -564,6 +617,22 @@ void gained (byte proj) {
       hasMissile = true;
       missileTimer.set(MISSILETRANSITTIMEMS);
       break;
+    case AST1:
+      asteroidType = AST1;
+    case AST2:
+      asteroidType = AST2;
+    case AST3:
+      asteroidType = AST3;
+    case AST4:
+      asteroidType = AST4;
+      asteroidTimer.set(ASTEROIDTRANSITTIMEMS);
+    break;
+    case FAST1:
+      fasteroidType = FAST1;
+    case FAST2:
+      fasteroidType = FAST2;
+      fasteroidTimer.set(FASTEROIDTRANSITTIMEMS);
+    break;
   }
 }
 
@@ -616,6 +685,16 @@ void clearSentProjectile (byte proj) {
     case MISSILE:
       hasMissile = false;
       break;
+    case AST1:
+    case AST2:
+    case AST3:
+    case AST4:
+      asteroidType = NOTHING;
+      break;
+    case FAST1:
+    case FAST2:
+      fasteroidType = NOTHING;
+      break;
   }
 }
 
@@ -664,12 +743,50 @@ void inGameDisplay () {
     else {
       setColor (SPACECOLOR);
     }
+    
+  renderAsteroids(true);
+    
   }
 
   renderMissile();
 
   if (isExploding) {
     setColor (ORANGE);
+  }
+}
+
+void renderAsteroids (bool debug) {
+  if (debug) {
+    switch (asteroidType) {
+      case AST1:
+        setColor (RED);
+        break;
+      case AST2:
+        setColor (ORANGE);
+        break;
+      case AST3:
+        setColor (YELLOW);
+        break;
+      case AST4:
+        setColor (WHITE);
+        break;
+    }
+      switch (fasteroidType) {
+      case FAST1:
+        setColor (BLUE);
+        break;
+      case FAST2:
+        setColor (GREEN);
+        break;
+    }
+  }
+  else {
+    if (asteroidType != NOTHING) {
+      setColor (ASTEROIDCOLOR);
+    }
+    if (fasteroidType != NOTHING) {
+      setColor (FASTEROIDCOLOR);
+    }
   }
 }
 
@@ -699,16 +816,16 @@ void renderMissile (){
 
 void commsDebugDisplay () {
   FOREACH_FACE(f) {
-    if (outgoingProjectiles[f] == MISSILE){
+    if (outgoingProjectiles[f] != NOTHING){
       setColorOnFace (CYAN, f);
     }
-    else if (incomingProjectiles[f] == MISSILE) {
+    else if (incomingProjectiles[f] != NOTHING) {
       setColorOnFace (MAGENTA, f);
     }
     else if (ACKSend[f] == 1) {
       setColorOnFace (YELLOW, f);
     }
-    if (projectilesBuffer[f] == MISSILE) {
+    if (projectilesBuffer[f] != NOTHING) {
       setColorOnFace (RED, f);
     }
     if (requestQueue[0] == f){
@@ -732,12 +849,12 @@ void displayHandler() {
   switch (gameState) {
     case SETUP: 
       layerTestDisplay(); // Verifies layer functionality
-      //directionalityTestDisplay(); // Verifies directionality functionality
+      directionalityTestDisplay(); // Verifies directionality functionality
       break;
     case SINGLEPLAYER:
     case MULTIPLAYER:
       inGameDisplay();
-      //commsDebugDisplay();
+      commsDebugDisplay();
       break;
     case GAMEOVER:
       gameoverDisplay();

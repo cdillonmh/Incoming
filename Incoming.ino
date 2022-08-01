@@ -12,8 +12,6 @@
 
 /*
  *  NEXT STEPS:
- *  - Explosions destroy asteroids
- *  - Asteroids damage Earth
  *  - Improve asteroid transit animation
  */
 

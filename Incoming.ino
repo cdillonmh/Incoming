@@ -619,16 +619,23 @@ void gained (byte proj) {
       break;
     case ASTONE:
       asteroidType = ASTONE;
+      asteroidTimer.set(ASTEROIDTRANSITTIMEMS);
+    break;
     case ASTTWO:
       asteroidType = ASTTWO;
+      asteroidTimer.set(ASTEROIDTRANSITTIMEMS);
+    break;
     case ASTTHREE:
       asteroidType = ASTTHREE;
+      asteroidTimer.set(ASTEROIDTRANSITTIMEMS);
+    break;
     case ASTFOUR:
       asteroidType = ASTFOUR;
       asteroidTimer.set(ASTEROIDTRANSITTIMEMS);
     break;
     case FASTONE:
-      fasteroidType = FASTONE;
+      fasteroidType = FASTONE;fasteroidTimer.set(FASTEROIDTRANSITTIMEMS);
+    break;
     case FASTTWO:
       fasteroidType = FASTTWO;
       fasteroidTimer.set(FASTEROIDTRANSITTIMEMS);

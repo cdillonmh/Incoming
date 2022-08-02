@@ -22,6 +22,12 @@
  *  - Earth sending asteroid spawn messages to edge in single player
  *    + Additional message protocols
  *    + Spawning timers and direction randomization
+ *    
+ *  - Improve Setup mode display
+ *  
+ *  - Improve Gameover mode display
+ *  
+ *  - Gameplay testing and iterations
  */
 
 /* 

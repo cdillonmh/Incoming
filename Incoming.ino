@@ -15,6 +15,7 @@
  *  - Multiplayer asteroid cooldown
  *  
  *  - Max (6?) asteroids per launcher in multiplayer?
+ *    + Create endgame trigger from launcher player, long timer after last asteroid is launched?
  *  
  *  - Earth sending asteroid spawn messages to edge in single player
  *    + Additional message protocols
@@ -47,6 +48,8 @@
 #define FASTEROIDTRANSITTIMEMS 1000
 #define MISSILETRANSITTIMEMS 250
 #define MISSILECOOLDOWNTIMEMS 1000
+#define ASTEROIDCOOLDOWNTIMEMS 2000
+#define FASTEROIDCOOLDOWNTIMEMS 3000
 #define EXPLOSIONTIMEMS 500
 #define EARTHFULLHEALTH 6
 #define ASTEROIDDAMAGE 1
@@ -383,7 +386,10 @@ void checkGameplayCollissions () {
 void inputHandler () {
   if (buttonSingleClicked() && !isEarth && !hasWoken() && !missileRequested) {
     if (gameState == MULTIPLAYER && isSpawner) {
-      gained(ASTONE);
+      if (missileCooldownTimer.isExpired()) {
+        gained(ASTONE);
+        missileCooldownTimer.set(ASTEROIDCOOLDOWNTIMEMS);
+      }
     }
     else {
       missileRequested = true;
@@ -393,7 +399,10 @@ void inputHandler () {
   }
 
   if (buttonDoubleClicked() && !isEarth && !hasWoken() && gameState == MULTIPLAYER && isSpawner) {
-    gained(FASTONE);
+    if (missileCooldownTimer.isExpired()) {
+        gained(FASTONE);
+        missileCooldownTimer.set(FASTEROIDCOOLDOWNTIMEMS);
+      }
   }
 }
 

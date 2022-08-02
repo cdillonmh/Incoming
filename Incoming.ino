@@ -13,6 +13,9 @@
 /*
  *  NEXT STEPS:
  *  - Improve asteroid transit animation
+ *  - Earth sending asteroid spawn messages to edge
+ *    + Additional message protocols
+ *    + Spawning timers and direction randomization
  */
 
 /* 
@@ -549,7 +552,7 @@ byte parseACKState (byte input) {
 }
 
 
-void incomingCommsHandler() {
+void incomingCommsHandler () {
   FOREACH_FACE(f) {
     if (isValueReceivedOnFaceExpired(f)) continue; //Skip open faces
     

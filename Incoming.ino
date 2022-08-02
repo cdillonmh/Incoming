@@ -12,10 +12,12 @@
 
 /*
  *  NEXT STEPS:
- *  - Multiplayer asteroid cooldown
+ *  - Asteroid and missile cooldown display overlay
  *  
  *  - Max (6?) asteroids per launcher in multiplayer?
  *    + Create endgame trigger from launcher player, long timer after last asteroid is launched?
+ *    + Spawn randomized asteroid loadout?
+ *    + Show loadout remaining and next launch (in missileRequest position, blinking)?
  *  
  *  - Earth sending asteroid spawn messages to edge in single player
  *    + Additional message protocols
@@ -24,6 +26,11 @@
 
 /* 
  *  IDEAS:
+ *  - Gameover state animations
+ *    + Earth destroyed, play explosion, then spawn three asteroids outward?
+ *    + Earth victorious, send explosions outward in fireworks display?
+ *  
+ *  
  *  - Can use blinkState (currently only used in setup) during in-game for something else...
  *    + Global missile cooldown?
  *    + Increasing difficulty levels?

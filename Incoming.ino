@@ -12,7 +12,10 @@
 
 /*
  *  NEXT STEPS:
- *  - Improve asteroid transit animation
+ *  - Multiplayer asteroid cooldown
+ *  
+ *  - Max (6?) asteroids per launcher in multiplayer?
+ *  
  *  - Earth sending asteroid spawn messages to edge in single player
  *    + Additional message protocols
  *    + Spawning timers and direction randomization
@@ -30,6 +33,8 @@
 #define SPACECOLOR OFF
 #define EARTHLAND GREEN
 #define EARTHSEA BLUE
+#define EARTHDISPLAYARRAY {EARTHLAND, EARTHLAND, EARTHSEA, EARTHLAND, EARTHSEA, EARTHSEA}
+#define EARTHDAMAGEORDER {1, 4, 5, 3, 2, 0}
 #define ASTEROIDCOLOR YELLOW
 #define FASTEROIDCOLOR RED
 #define MISSILECOLOR WHITE
@@ -38,8 +43,8 @@
 #define SPAWNERCOLOR CYAN
 
 // Game Balance
-#define ASTEROIDTRANSITTIMEMS 350
-#define FASTEROIDTRANSITTIMEMS 350
+#define ASTEROIDTRANSITTIMEMS 1000
+#define FASTEROIDTRANSITTIMEMS 1000
 #define MISSILETRANSITTIMEMS 250
 #define MISSILECOOLDOWNTIMEMS 1000
 #define EXPLOSIONTIMEMS 500
@@ -48,7 +53,7 @@
 #define FASTEROIDDAMAGE 1
 
 // General presets
-#define ANIMATIONTIMERMS 1000
+#define ANIMATIONTIMERMS 3000
 #define REQUESTQUEUESIZE 12
 #define REQUESTTIMEOUTTIMERMS 7500
 #define COMMSTIMEOUTTIMERMS 7000
@@ -426,33 +431,31 @@ void clearACKArray (byte target[]) {
 
 // Clear variables and arrays to reset for next game
 void resetAll () {
-  if (missileRequestFace != -1) {
-    // Projectiles
-    clearProjectileArray(incomingProjectiles);
-    clearProjectileArray(receivedProjectiles);
-    clearACKArray(ACKReceive);
-    clearProjectileArray(outgoingProjectiles);
-    clearProjectileArray(projectilesBuffer);
-    clearACKArray(ACKSend);
-    asteroidType = NOTHING;
-    fasteroidType = NOTHING;
-    hasMissile = false;
-    missileRequested = false;
-    missileRequestFace = -1;
-    clearRequestQueue();
-    isExploding = false;
-    isSpawner = false;
-    earthHealth = EARTHFULLHEALTH;
+  // Projectiles
+  clearProjectileArray(incomingProjectiles);
+  clearProjectileArray(receivedProjectiles);
+  clearACKArray(ACKReceive);
+  clearProjectileArray(outgoingProjectiles);
+  clearProjectileArray(projectilesBuffer);
+  clearACKArray(ACKSend);
+  asteroidType = NOTHING;
+  fasteroidType = NOTHING;
+  hasMissile = false;
+  missileRequested = false;
+  missileRequestFace = -1;
+  clearRequestQueue();
+  isExploding = false;
+  isSpawner = false;
+  earthHealth = EARTHFULLHEALTH;
 
-    // Projectile Timers
-    asteroidTimer.set(0);
-    fasteroidTimer.set(0);
-    missileTimer.set(0);
-    missileCooldownTimer.set(0);
-    explosionTimer.set(0);
-    requestTimeoutTimer.set(0);
-    commsTimeoutTimer.set(0);
-  }
+  // Projectile Timers
+  asteroidTimer.set(0);
+  fasteroidTimer.set(0);
+  missileTimer.set(0);
+  missileCooldownTimer.set(0);
+  explosionTimer.set(0);
+  requestTimeoutTimer.set(0);
+  commsTimeoutTimer.set(0);
 }
 
 void layerTestDisplay (){
@@ -766,14 +769,7 @@ void outgoingCommsHandler() {
 
 void inGameDisplay () {
   if (isEarth) {
-    FOREACH_FACE(f) {
-      if (f%2 > 0) {
-        setColorOnFace(EARTHLAND, f);
-      }
-      else {
-        setColorOnFace(EARTHSEA, f);
-      }
-    }
+    renderEarth();
   }
   else {
     if (isSpawner && gameState == MULTIPLAYER) {
@@ -792,6 +788,31 @@ void inGameDisplay () {
   if (isExploding) {
     setColor (ORANGE);
   }
+}
+
+void renderEarth () {
+  int startingFace;
+  
+  if (gameState == SINGLEPLAYER || gameState == MULTIPLAYER) {
+    startingFace = int(animationTimer.getRemaining() / (ANIMATIONTIMERMS / FACE_COUNT));
+  }
+  else {
+    startingFace = 0;
+  }
+  
+  Color earthColors[] = EARTHDISPLAYARRAY;
+  byte damageOrder[] = EARTHDAMAGEORDER;
+
+  FOREACH_FACE(f) {
+    if (f < (EARTHFULLHEALTH - earthHealth)){
+      earthColors[damageOrder[f]] = DAMAGECOLOR;
+    }
+  }
+  
+  FOREACH_FACE(f) {
+      // Set earth colors plus rotation (based on animation speed)
+      setColorOnFace(earthColors[f], ((f+startingFace)%6));
+    }
 }
 
 void renderAsteroids (bool debug) {
@@ -820,49 +841,82 @@ void renderAsteroids (bool debug) {
     }
   }
   else {
+//    if (asteroidType == ASTFOUR || asteroidType == ASTTHREE) {
+//      if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.66)) {
+//        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,2,3,missileRequestFace);
+//      }
+//      else if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.33)) {
+//        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,3,4,missileRequestFace);
+//      }
+//      else {
+//        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,4,5,missileRequestFace);
+//      }
+//    }
+//    else if (asteroidType == ASTTWO || asteroidType == ASTONE) {
+//      if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.66)) {
+//        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,2,3,missileRequestFace);
+//      }
+//      else if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.33)) {
+//        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,1,2,missileRequestFace);
+//      }
+//      else {
+//        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,0,1,missileRequestFace);
+//      }
+//    }
+//    
+//    if (fasteroidType == FASTTWO) {
+//      if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.66)) {
+//        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,2,3,missileRequestFace);
+//      }
+//      else if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.33)) {
+//        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,3,4,missileRequestFace);
+//      }
+//      else {
+//        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,4,5,missileRequestFace);
+//      }
+//    }
+//    else if (fasteroidType == FASTONE) {
+//      if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.66)) {
+//        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,2,3,missileRequestFace);
+//      }
+//      else if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.33)) {
+//        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,1,2,missileRequestFace);
+//      }
+//      else {
+//        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,0,1,missileRequestFace);
+//      }
+//    }
     if (asteroidType == ASTFOUR || asteroidType == ASTTHREE) {
-      if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.66)) {
+      if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.5)) {
         setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,2,3,missileRequestFace);
-      }
-      else if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.33)) {
-        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,3,4,missileRequestFace);
       }
       else {
         setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,4,5,missileRequestFace);
       }
     }
     else if (asteroidType == ASTTWO || asteroidType == ASTONE) {
-      if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.66)) {
-        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,2,3,missileRequestFace);
-      }
-      else if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.33)) {
+      if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.5)) {
         setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,1,2,missileRequestFace);
       }
       else {
-        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,0,1,missileRequestFace);
+        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,0,5,missileRequestFace);
       }
     }
     
     if (fasteroidType == FASTTWO) {
-      if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.66)) {
+      if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.5)) {
         setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,2,3,missileRequestFace);
-      }
-      else if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.33)) {
-        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,3,4,missileRequestFace);
       }
       else {
         setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,4,5,missileRequestFace);
       }
     }
     else if (fasteroidType == FASTONE) {
-      if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.66)) {
-        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,2,3,missileRequestFace);
-      }
-      else if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.33)) {
+      if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.5)) {
         setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,1,2,missileRequestFace);
       }
       else {
-        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,0,1,missileRequestFace);
+        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,0,5,missileRequestFace);
       }
     }
   }
@@ -900,7 +954,6 @@ void renderMissile (){
     }
   }
 }
-
 
 void commsDebugDisplay () {
   FOREACH_FACE(f) {

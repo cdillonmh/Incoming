@@ -12,6 +12,8 @@
 
 /*
  *  NEXT STEPS:
+ *  - Find more storage space!
+ *  
  *  - Earth sending asteroid spawn messages to edge in single player
  *    + Additional message protocols
  *    + Spawning timers and direction randomization
@@ -30,8 +32,7 @@
  *    + Increasing difficulty levels?
  *    + Other stuff for multiplayer mode?
  *    
- *    
- *  - Max (6?) asteroids per launcher in multiplayer?
+ *  - Multiplayer improvements?
  *    + Create endgame trigger from launcher player, long timer after last asteroid is launched?
  *    + Spawn randomized asteroid loadout?
  *    + Show loadout remaining and next launch (in missileRequest position, blinking)?
@@ -48,7 +49,7 @@
 #define MISSILECOLOR WHITE
 #define EXPLOSIONCOLOR ORANGE
 #define DAMAGECOLOR RED
-#define SPAWNERCOLOR CYAN
+#define SPAWNERCOLOR ORANGE
 #define CHARGETIMERCOLOR WHITE
 
 // Game Balance
@@ -57,7 +58,7 @@
 #define MISSILETRANSITTIMEMS 250
 #define MISSILECOOLDOWNTIMEMS 1000
 #define ASTEROIDCOOLDOWNTIMEMS 3000
-#define FASTEROIDCOOLDOWNTIMEMS 3000
+#define FASTEROIDCOOLDOWNTIMEMS 6000
 #define EXPLOSIONTIMEMS 500
 #define EARTHFULLHEALTH 6
 #define ASTEROIDDAMAGE 1
@@ -68,7 +69,7 @@
 #define REQUESTQUEUESIZE 12
 #define REQUESTTIMEOUTTIMERMS 7500
 #define COMMSTIMEOUTTIMERMS 7000
-#define DEATHANIMATIONTIMEMS 3500
+#define DEATHANIMATIONTIMEMS 2700
 
 // Game States
 enum gameStates {SETUP, SINGLEPLAYER, MULTIPLAYER, GAMEOVER};
@@ -255,7 +256,7 @@ void determineDirectionality () {
   
   FOREACH_FACE(f) {
     byte currentFace = f;
-    byte nextFace = ((f+1)%6);
+    byte nextFace = (returnNextFace(f));
     if (!isSpawner) {
       if (faceDirection[currentFace] == UNDETERMINED) {
         if (faceDirection[nextFace] == INWARD) {
@@ -268,11 +269,12 @@ void determineDirectionality () {
       }
     }
     else {
+      //byte nextNextFace = returnNextFace(nextFace);
       if (faceDirection[currentFace] == EDGE && faceDirection[nextFace] != EDGE) {
         faceDirection[nextFace] = INWARD;
         missileRequestFace = nextFace;
-        if (faceDirection[(nextFace+1)%6] != EDGE){
-          faceDirection[(nextFace+1)%6] = INWARD;
+        if (faceDirection[returnNextFace(nextFace)] != EDGE){
+          faceDirection[returnNextFace(nextFace)] = INWARD;
         }
       }
     }
@@ -281,14 +283,23 @@ void determineDirectionality () {
 
 // Check if game should start
 void checkStartGame () {
-  if (buttonSingleClicked() && isEarth && !hasWoken()){
-    gameState = SINGLEPLAYER;
-  }
-  else if (buttonDoubleClicked() && isEarth && !hasWoken()) {
-    gameState = MULTIPLAYER;
+  if (buttonSingleClicked() && !hasWoken()){
+    if (isEarth) {
+      gameState = SINGLEPLAYER;
+    }
+    else if (isSpawner) {
+      gameState = MULTIPLAYER;
+    }
   }
 }
 
+byte returnNextFace (byte face) {
+  return (face+1)%6;
+}
+
+byte returnPrevFace (byte face) {
+  return (face+5)%6;
+}
 
 // Check and handle expired projectile timers
 void projectileTimerHandler () {
@@ -396,9 +407,10 @@ void checkGameplayCollissions () {
 void inputHandler () {
   if (buttonSingleClicked() && !isEarth && !hasWoken() && !missileRequested) {
     if (gameState == MULTIPLAYER && isSpawner) {
-      if (missileCooldownTimer.isExpired()) {
+      if (missileCooldownTimer.isExpired() && earthHealth > 0) {
         gained(ASTONE);
         missileCooldownTimer.set(ASTEROIDCOOLDOWNTIMEMS);
+        earthHealth--;
       }
     }
     else {
@@ -408,10 +420,11 @@ void inputHandler () {
     }
   }
 
-  if (buttonDoubleClicked() && !isEarth && !hasWoken() && gameState == MULTIPLAYER && isSpawner) {
+  if (buttonDoubleClicked() && !isEarth && !hasWoken() && gameState == MULTIPLAYER && isSpawner && earthHealth > 0) {
     if (missileCooldownTimer.isExpired()) {
         gained(FASTONE);
         missileCooldownTimer.set(FASTEROIDCOOLDOWNTIMEMS);
+        earthHealth--;
       }
   }
 }
@@ -737,7 +750,7 @@ void processRequestQueue () {
   }
 }
 
-void sendProjectileOnFace (byte proj, int face) {
+void sendProjectileOnFace (byte proj, byte face) {
   if (outgoingProjectiles[face] == NOTHING) {
     outgoingProjectiles[face] = proj;
     clearSentProjectile(proj);
@@ -766,7 +779,7 @@ void clearSentProjectile (byte proj) {
   }
 }
 
-void processBufferOnFace (int f) {
+void processBufferOnFace (byte f) {
   if ((projectilesBuffer[f] != NOTHING) && (outgoingProjectiles[f] == NOTHING)) {
     outgoingProjectiles[f] = projectilesBuffer[f];
     projectilesBuffer[f] = NOTHING;
@@ -799,10 +812,20 @@ void inGameDisplay () {
   }
   else {
     if (isSpawner && gameState != SINGLEPLAYER) {
-      setColor (SPAWNERCOLOR);
+      
+      FOREACH_FACE(f) {
+        byte currentFace = (missileRequestFace+f)%6;
+        if (currentFace < earthHealth) {
+          setColorOnFace (SPAWNERCOLOR, currentFace);
+        }
+        else {
+          setColorOnFace (OFF, currentFace);
+        }
+      }
     }
     else if (!isSpawner && gameState == SETUP){
       int animTimer = animationTimer.getRemaining();
+
       if (animTimer < 500 && animTimer > 250) {
         setColorOnFace(makeColorRGB(animTimer-245,animTimer-245,animTimer-245), 3);
       } else if (animTimer < 250){
@@ -1023,11 +1046,12 @@ void commsDebugDisplay () {
 
 void rechargingDisplay () {
   if (!missileCooldownTimer.isExpired()) {
+    int cooldownValue = missileCooldownTimer.getRemaining();
     if (isSpawner) {
-      setColorOnFace(CHARGETIMERCOLOR,(missileRequestFace + (missileCooldownTimer.getRemaining()/(ASTEROIDCOOLDOWNTIMEMS / FACE_COUNT)))%6);
+      setColorOnFace(CHARGETIMERCOLOR,(missileRequestFace + (cooldownValue/(FASTEROIDCOOLDOWNTIMEMS / FACE_COUNT)))%6);
     }
     else if (isEarth) {
-      setColorOnFace(CHARGETIMERCOLOR,(missileCooldownTimer.getRemaining()/(MISSILECOOLDOWNTIMEMS / FACE_COUNT))%6);
+      setColorOnFace(CHARGETIMERCOLOR,(cooldownValue/(MISSILECOOLDOWNTIMEMS / FACE_COUNT))%6);
     }
     
   }

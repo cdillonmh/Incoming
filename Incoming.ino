@@ -12,18 +12,9 @@
 
 /*
  *  NEXT STEPS:
- *  - Max (6?) asteroids per launcher in multiplayer?
- *    + Create endgame trigger from launcher player, long timer after last asteroid is launched?
- *    + Spawn randomized asteroid loadout?
- *    + Show loadout remaining and next launch (in missileRequest position, blinking)?
- *  
  *  - Earth sending asteroid spawn messages to edge in single player
  *    + Additional message protocols
  *    + Spawning timers and direction randomization
- *    
- *  - Improve Setup mode display
- *  
- *  - Improve Gameover mode display
  *  
  *  - Gameplay testing and iterations
  *  
@@ -32,15 +23,18 @@
 
 /* 
  *  IDEAS:
- *  - Gameover state animations
- *    + Earth destroyed, play explosion, then spawn three asteroids outward?
- *    + Earth victorious, send explosions outward in fireworks display?
- *  
+ *  - Single presses on launcher to start multiplayer instead?
  *  
  *  - Can use blinkState (currently only used in setup) during in-game for something else...
  *    + Global missile cooldown?
  *    + Increasing difficulty levels?
  *    + Other stuff for multiplayer mode?
+ *    
+ *    
+ *  - Max (6?) asteroids per launcher in multiplayer?
+ *    + Create endgame trigger from launcher player, long timer after last asteroid is launched?
+ *    + Spawn randomized asteroid loadout?
+ *    + Show loadout remaining and next launch (in missileRequest position, blinking)?
  */
 
 // Color Defaults
@@ -74,7 +68,7 @@
 #define REQUESTQUEUESIZE 12
 #define REQUESTTIMEOUTTIMERMS 7500
 #define COMMSTIMEOUTTIMERMS 7000
-#define DEATHANIMATIONTIMEMS 4000
+#define DEATHANIMATIONTIMEMS 3500
 
 // Game States
 enum gameStates {SETUP, SINGLEPLAYER, MULTIPLAYER, GAMEOVER};
@@ -455,6 +449,7 @@ void clearACKArray (byte target[]) {
 }
 
 void resetEarthHealth () {
+//  if (earthHealth != EARTHFULLHEALTH) setColor(WHITE); //Quick flash on game reset (didn't work)
   earthHealth = EARTHFULLHEALTH;
   isExploding = false;
   explosionTimer.set(0);
@@ -803,8 +798,19 @@ void inGameDisplay () {
     renderEarth();
   }
   else {
-    if (isSpawner) {
+    if (isSpawner && gameState != SINGLEPLAYER) {
       setColor (SPAWNERCOLOR);
+    }
+    else if (!isSpawner && gameState == SETUP){
+      int animTimer = animationTimer.getRemaining();
+      if (animTimer < 500 && animTimer > 250) {
+        setColorOnFace(makeColorRGB(animTimer-245,animTimer-245,animTimer-245), 3);
+      } else if (animTimer < 250){
+        animationTimer.set(animTimer + 2500 + random(3500));
+      }
+      else {
+        setColor (SPACECOLOR);
+      }
     }
     else {
       setColor (SPACECOLOR);
@@ -824,8 +830,9 @@ void inGameDisplay () {
 
 void renderExplosion () {
     if (isExploding) {
-      byte red = constrain(explosionTimer.getRemaining(),0,255);
-      byte green = constrain(explosionTimer.getRemaining(),0,255);
+      byte explosionValue = explosionTimer.getRemaining();
+      byte red = constrain(explosionValue,0,255);
+      byte green = constrain(explosionValue,0,255);
     setColor (makeColorRGB(red,green/2,0));
     setColorOnFace(makeColorRGB(red,green,0),animationTimer.getRemaining()%6);
   }

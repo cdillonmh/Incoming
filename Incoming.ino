@@ -830,11 +830,9 @@ void inGameDisplay () {
 
 void renderExplosion () {
     if (isExploding) {
-      byte explosionValue = explosionTimer.getRemaining();
-      byte red = constrain(explosionValue,0,255);
-      byte green = constrain(explosionValue,0,255);
-    setColor (makeColorRGB(red,green/2,0));
-    setColorOnFace(makeColorRGB(red,green,0),animationTimer.getRemaining()%6);
+      int explosionValue = constrain(explosionTimer.getRemaining(),0,255);
+      setColor (makeColorRGB(explosionValue,explosionValue/2,0));
+      setColorOnFace(makeColorRGB(explosionValue,explosionValue,0),animationTimer.getRemaining()%6);
   }
 }
 

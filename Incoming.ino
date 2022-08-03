@@ -12,8 +12,6 @@
 
 /*
  *  NEXT STEPS:
- *  - Asteroid and missile cooldown display overlay
- *  
  *  - Max (6?) asteroids per launcher in multiplayer?
  *    + Create endgame trigger from launcher player, long timer after last asteroid is launched?
  *    + Spawn randomized asteroid loadout?
@@ -28,6 +26,8 @@
  *  - Improve Gameover mode display
  *  
  *  - Gameplay testing and iterations
+ *  
+ *  - Improve targetting display?
  */
 
 /* 
@@ -55,13 +55,14 @@
 #define EXPLOSIONCOLOR ORANGE
 #define DAMAGECOLOR RED
 #define SPAWNERCOLOR CYAN
+#define CHARGETIMERCOLOR WHITE
 
 // Game Balance
 #define ASTEROIDTRANSITTIMEMS 1000
 #define FASTEROIDTRANSITTIMEMS 1000
 #define MISSILETRANSITTIMEMS 250
 #define MISSILECOOLDOWNTIMEMS 1000
-#define ASTEROIDCOOLDOWNTIMEMS 2000
+#define ASTEROIDCOOLDOWNTIMEMS 3000
 #define FASTEROIDCOOLDOWNTIMEMS 3000
 #define EXPLOSIONTIMEMS 500
 #define EARTHFULLHEALTH 6
@@ -73,6 +74,7 @@
 #define REQUESTQUEUESIZE 12
 #define REQUESTTIMEOUTTIMERMS 7500
 #define COMMSTIMEOUTTIMERMS 7000
+#define DEATHANIMATIONTIMEMS 4000
 
 // Game States
 enum gameStates {SETUP, SINGLEPLAYER, MULTIPLAYER, GAMEOVER};
@@ -143,6 +145,7 @@ void loop() {
   switch (gameState) {
     case SETUP:
       checkBlinkState(); // Uses outside edge to help determine center Earth blink
+      resetEarthHealth();
       checkStartGame();
       break;
     case SINGLEPLAYER:
@@ -428,7 +431,7 @@ void tempCheckEndGame () {
 
 // End GAMEOVER state and return to SETUP
 void checkResetGame () {
-  if (buttonSingleClicked() && isEarth && !hasWoken()) {
+  if (buttonSingleClicked() && !hasWoken()) {
     gameState = SETUP;
   }
 }
@@ -451,6 +454,12 @@ void clearACKArray (byte target[]) {
   }
 }
 
+void resetEarthHealth () {
+  earthHealth = EARTHFULLHEALTH;
+  isExploding = false;
+  explosionTimer.set(0);
+}
+
 // Clear variables and arrays to reset for next game
 void resetAll () {
   // Projectiles
@@ -466,16 +475,16 @@ void resetAll () {
   missileRequested = false;
   missileRequestFace = -1;
   clearRequestQueue();
-  isExploding = false;
+  //isExploding = false;
   isSpawner = false;
-  earthHealth = EARTHFULLHEALTH;
+  //earthHealth = EARTHFULLHEALTH;
 
   // Projectile Timers
   asteroidTimer.set(0);
   fasteroidTimer.set(0);
   missileTimer.set(0);
   missileCooldownTimer.set(0);
-  explosionTimer.set(0);
+  //explosionTimer.set(0);
   requestTimeoutTimer.set(0);
   commsTimeoutTimer.set(0);
 }
@@ -794,7 +803,7 @@ void inGameDisplay () {
     renderEarth();
   }
   else {
-    if (isSpawner && gameState == MULTIPLAYER) {
+    if (isSpawner) {
       setColor (SPAWNERCOLOR);
     }
     else {
@@ -807,8 +816,18 @@ void inGameDisplay () {
 
   renderMissile();
 
-  if (isExploding) {
-    setColor (ORANGE);
+  rechargingDisplay();
+
+  renderExplosion ();
+
+}
+
+void renderExplosion () {
+    if (isExploding) {
+      byte red = constrain(explosionTimer.getRemaining(),0,255);
+      byte green = constrain(explosionTimer.getRemaining(),0,255);
+    setColor (makeColorRGB(red,green/2,0));
+    setColorOnFace(makeColorRGB(red,green,0),animationTimer.getRemaining()%6);
   }
 }
 
@@ -997,12 +1016,38 @@ void commsDebugDisplay () {
   }
 }
 
+void rechargingDisplay () {
+  if (!missileCooldownTimer.isExpired()) {
+    if (isSpawner) {
+      setColorOnFace(CHARGETIMERCOLOR,(missileRequestFace + (missileCooldownTimer.getRemaining()/(ASTEROIDCOOLDOWNTIMEMS / FACE_COUNT)))%6);
+    }
+    else if (isEarth) {
+      setColorOnFace(CHARGETIMERCOLOR,(missileCooldownTimer.getRemaining()/(MISSILECOOLDOWNTIMEMS / FACE_COUNT))%6);
+    }
+    
+  }
+}
+
 void gameoverDisplay () {
   if (isEarth) {
-    setColor(CYAN);
+    if (earthHealth > 0){
+      renderEarth();
+    } else {
+      if (earthHealth < -99) {
+        renderExplosion();
+      } else {
+        earthHealth = -100;
+        startExplosion();
+        explosionTimer.set(DEATHANIMATIONTIMEMS);
+      }
+    }
   }
-  else {
-    setColor(MAGENTA);
+  else if (blinkState != L0 && earthHealth < -99) {
+    renderExplosion();
+  }
+  else if (blinkState !=L0) {
+    earthHealth = earthHealth - blinkState;
+    if (earthHealth < -99) startExplosion();
   }
 }
 
@@ -1010,8 +1055,9 @@ void displayHandler() {
   if (animationTimer.isExpired()) animationTimer.set(ANIMATIONTIMERMS);
   
   switch (gameState) {
-    case SETUP: 
-      layerTestDisplay(); // Verifies layer functionality
+    case SETUP:
+      inGameDisplay();
+      //layerTestDisplay(); // Verifies layer functionality
       //directionalityTestDisplay(); // Verifies directionality functionality
       break;
     case SINGLEPLAYER:

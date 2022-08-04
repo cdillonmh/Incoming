@@ -46,7 +46,7 @@
 #define MISSILECOLOR WHITE
 #define EXPLOSIONCOLOR ORANGE
 #define DAMAGECOLOR RED
-#define SPAWNERCOLOR ORANGE
+#define SPAWNERCOLOR MAGENTA
 #define CHARGETIMERCOLOR WHITE
 
 // Game Balance
@@ -348,7 +348,7 @@ void checkSpawnAsteroid () {
       else {
         asteroidsRemaining--;
 
-        sendProjectileOnFace(random(5)+1,random(5));
+        sendProjectileOnFace(random(5)+1,random(5), false);
         
         explosionTimer.set((BASEASTEROIDDELAYMS - (currentLevel * SPEEDINCREASEPERLEVEL)) + random(ADDITIONALDELAYMAXMS - (currentLevel * SPEEDINCREASEPERLEVEL)));
       }
@@ -364,16 +364,16 @@ void projectileTimerHandler () {
   if (asteroidType != NOTHING && asteroidTimer.isExpired()) {
     switch (asteroidType) {
       case ASTONE:
-        sendProjectileOnFace(ASTFOUR,missileRequestFace);
+        sendProjectileOnFace(ASTFOUR,missileRequestFace, true);
         break;
       case ASTTWO:
-        sendProjectileOnFace(ASTONE,leftOfMissileRequestFace);
+        sendProjectileOnFace(ASTONE,leftOfMissileRequestFace, true);
         break;
       case ASTTHREE:
-        sendProjectileOnFace(ASTTWO,leftOfMissileRequestFace);
+        sendProjectileOnFace(ASTTWO,leftOfMissileRequestFace, true);
         break;
       case ASTFOUR:
-        sendProjectileOnFace(ASTTHREE,leftOfMissileRequestFace);
+        sendProjectileOnFace(ASTTHREE,leftOfMissileRequestFace, true);
         break;
     }
   }
@@ -382,10 +382,10 @@ void projectileTimerHandler () {
   if (fasteroidType != NOTHING && fasteroidTimer.isExpired()) {
     switch (fasteroidType) {
       case FASTONE:
-        sendProjectileOnFace(FASTTWO,missileRequestFace);
+        sendProjectileOnFace(FASTTWO,missileRequestFace, true);
         break;
       case FASTTWO:
-        sendProjectileOnFace(FASTONE,leftOfMissileRequestFace);
+        sendProjectileOnFace(FASTONE,leftOfMissileRequestFace, true);
         break;
     }
   }
@@ -393,7 +393,7 @@ void projectileTimerHandler () {
   // Handle Missiles
   if (hasMissile && missileTimer.isExpired()) {
     if (!missileRequested && requestQueue[0] != requestQueueEmptyValue) {
-      sendProjectileOnFace(MISSILE,getNextRequest());
+      sendProjectileOnFace(MISSILE,getNextRequest(), true);
     }
     else {
       startExplosion();
@@ -417,7 +417,7 @@ void projectileTimerHandler () {
   if (isEarth) {
     //processRequestQueue();
     if ((requestQueue[0] != requestQueueEmptyValue) && (missileCooldownTimer.isExpired())) {
-      sendProjectileOnFace(MISSILE,getNextRequest());
+      sendProjectileOnFace(MISSILE,getNextRequest(), true);
       missileCooldownTimer.set(MISSILECOOLDOWNTIMEMS);
     }
   }
@@ -471,7 +471,7 @@ void inputHandler () {
     }
     else {
       missileRequested = true;
-      sendProjectileOnFace(MISSILE, missileRequestFace);
+      sendProjectileOnFace(MISSILE, missileRequestFace, false);
       requestTimeoutTimer.set(REQUESTTIMEOUTTIMERMS);
     }
   }
@@ -719,11 +719,11 @@ void projectileManager () {
           if (tempDirection != INWARD) { // Missile request received! Pass on immediately inward if not Earth.
             if (!isEarth) {
               addMissileRequest(f);
-              sendProjectileOnFace(MISSILE, missileRequestFace);
+              sendProjectileOnFace(MISSILE, missileRequestFace, false);
             }
             else if (missileCooldownTimer.isExpired()) { // If Earth and cooldown expired, bounce the request back.
               addMissileRequest(f);
-              sendProjectileOnFace(MISSILE, getNextRequest());
+              sendProjectileOnFace(MISSILE, getNextRequest(), false);
               missileCooldownTimer.set(MISSILECOOLDOWNTIMEMS);
             }
             else { // If Earth and cooldown was running, add to request queue
@@ -742,7 +742,7 @@ void projectileManager () {
         case FASTTWO:
           byte opposingFace = faceDirection[(f+3)%6];
           if (tempDirection == INWARD && opposingFace != EDGE ){
-            sendProjectileOnFace(tempProjectile, opposingFace);
+            sendProjectileOnFace(tempProjectile, opposingFace, false);
           }
           else {
             gained (tempProjectile);
@@ -819,14 +819,14 @@ void processRequestQueue () {
   }
 }
 
-void sendProjectileOnFace (byte proj, byte face) {
+void sendProjectileOnFace (byte proj, byte face, bool isReal) {
   if (outgoingProjectiles[face] == NOTHING) {
     outgoingProjectiles[face] = proj;
-    clearSentProjectile(proj);
+    if (isReal) clearSentProjectile(proj);
   }
   else if (projectilesBuffer[face] == NOTHING) {
     projectilesBuffer[face] = proj;
-    clearSentProjectile(proj);
+    if (isReal) clearSentProjectile(proj);
   }
 }
 

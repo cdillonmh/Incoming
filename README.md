@@ -1,7 +1,7 @@
 # Incoming
  Missile-Command-like game for Move38 Blinks by Dillon Hall
  
- Note: Requires [brunoga's custom blinklib](https://github.com/brunoga/blinklib) with datagrams disabled to install.
+ **Note:** Requires [brunoga's custom blinklib](https://github.com/brunoga/blinklib) with datagrams disabled to install.
 
 ## Intro
 A solo or asymmetric multiplayer game of protecting the Earth from asteroids spiraling towards it. Asteroids spawn from the edge of a hexagonal map, either in ever faster and more numerous waves in the solo mode or triggered by your opponent in multiplayer. Defend the earth by sending missiles to intercept the asteroids, taking into account their trajectory, missile speed/distance, and the time it takes to reload after each launch.
@@ -23,6 +23,16 @@ Each asteroid that impacts the earth causes 1 unit of damage. Accumulate 6 units
 You can target multiple spaces and the earth will fire missiles at each one when it's able. Note that the missiles are big but not terribly smart. They may get confused by too many targeting requests or nearby targets. Fewer, more accurate shots tends to be more effective than firing with reckless abandon.
 
 ## Attacking the Earth
-As the magenta attacking player, your task is to time the launch of fast and slow asteroids from your launchers. Single-click a launcher to send a slow asteroid, after which your launcher will have a short reload time before it can launch again. Double-click a launcher to send a fast asteroid, but note that it will take twice as long to reload that launcher.
+As the magenta attacking player, your task is to time the launch of fast and slow asteroids from your launchers to confuse and overwhelm the defender. Single-click a launcher to send a slow asteroid, after which your launcher will have a short reload time before it can launch again. Double-click a launcher to send a fast asteroid, but note that it will take twice as long to reload that launcher.
 
 Each launcher has six asteroids loaded. Destroy the earth before you run out of asteroids and you win!
+
+## Multiplayer Variations
+**Varying Difficulty**: 
+A minimum of 3 asteroid launchers is recommended for multiplayer mode. Feel free to use 2 for a game weighted more toward the defending player, or 4+ for a game that favors the attacking player.
+
+**Two-In-A-Row**: 
+Players switch roles after each game. To win overall, you must win a game as attacker and then as a defender (or vice-versa).
+
+**Party Mode**: 
+Split into teams, with oner or more players coordinating as attackers and one or more playing as defenders. This works better with a larger number of blinks.

@@ -6,6 +6,7 @@
 
 /*
  *  KNOWN ISSUES:
+ *  - Solo asteroid spawns not always sending to edge blinks.
  *  - Occasional missile request collisions causing lost requests (Comms timeout timers helping)
  *  - Asteroids can collide and cause lost comms (not a big issue, really)
  */
@@ -13,10 +14,6 @@
 /*
  *  NEXT STEPS:
  *  - Find more storage space!
- *  
- *  - Earth sending asteroid spawn messages to edge in single player
- *    + Additional message protocols
- *    + Spawning timers and direction randomization
  *  
  *  - Gameplay testing and iterations
  *  
@@ -64,6 +61,18 @@
 #define ASTEROIDDAMAGE 1
 #define FASTEROIDDAMAGE 1
 
+// Solo Game Balance
+#define GAMESTARTDELAY 1200
+#define GAMEENDDELAY 5000
+#define BASEASTEROIDDELAYMS 800
+#define ADDITIONALDELAYMAXMS 800
+#define INITIALNUMASTEROIDS 8
+
+// Solo Leveling Balance
+#define SPEEDINCREASEPERLEVEL 50
+#define NUMASTEROIDSINCREASEPERLEVEL 2
+#define MAXLEVEL 9
+
 // General presets
 #define ANIMATIONTIMERMS 3000
 #define REQUESTQUEUESIZE 12
@@ -102,6 +111,12 @@ byte requestQueue[REQUESTQUEUESIZE];
 byte requestQueueEmptyValue;
 bool isExploding = false;
 int earthHealth = EARTHFULLHEALTH;
+
+// Solo Mode
+bool levelStarted = false;
+bool levelDone = false;
+byte currentLevel = 0;
+byte asteroidsRemaining;
 
 // Projectile Timers
 Timer asteroidTimer;
@@ -145,6 +160,7 @@ void loop() {
       checkStartGame();
       break;
     case SINGLEPLAYER:
+      checkSpawnAsteroid();
     case MULTIPLAYER:
       checkGameplayCollissions();
       projectileTimerHandler();
@@ -305,6 +321,47 @@ byte returnPrevFace (byte face) {
   return (face+5)%6;
 }
 
+
+
+
+// Check and handle solo mode asteroid spawns
+void checkSpawnAsteroid () {
+  if (isEarth && gameState == SINGLEPLAYER) {
+    if (explosionTimer.isExpired()) {
+      if (!levelStarted) {
+        explosionTimer.set(GAMESTARTDELAY);
+        levelStarted = true;
+        asteroidsRemaining = INITIALNUMASTEROIDS + (currentLevel * NUMASTEROIDSINCREASEPERLEVEL);
+      }
+      else if (levelDone) {
+        if (currentLevel == MAXLEVEL) {
+          gameState = GAMEOVER;
+        } else {
+          currentLevel++;
+          levelStarted = false;
+          levelDone = false;
+        }
+      }
+      else if (asteroidsRemaining < 1) {
+        levelDone = true;
+        explosionTimer.set(GAMEENDDELAY);
+      }
+      
+      else {
+        asteroidsRemaining--;
+
+        sendProjectileOnFace(random(5)+1,random(5));
+        
+        explosionTimer.set((BASEASTEROIDDELAYMS - (currentLevel * SPEEDINCREASEPERLEVEL)) + random(ADDITIONALDELAYMAXMS - (currentLevel * SPEEDINCREASEPERLEVEL)));
+      }
+    }
+  }
+}
+
+
+
+
+
 // Check and handle expired projectile timers
 void projectileTimerHandler () {
 
@@ -424,7 +481,7 @@ void inputHandler () {
     }
   }
 
-  if (buttonDoubleClicked() && !isEarth && !hasWoken() && gameState == MULTIPLAYER && isSpawner && earthHealth > 0) {
+  if (buttonDoubleClicked() && !hasWoken() && gameState == MULTIPLAYER && isSpawner && earthHealth > 0) {
     if (missileCooldownTimer.isExpired()) {
         gained(FASTONE);
         missileCooldownTimer.set(FASTEROIDCOOLDOWNTIMEMS);
@@ -500,6 +557,12 @@ void resetAll () {
   //explosionTimer.set(0);
   requestTimeoutTimer.set(0);
   commsTimeoutTimer.set(0);
+
+  // Solo Mode
+  levelStarted = false;
+  levelDone = false;
+  currentLevel = 0;
+  asteroidsRemaining = 0;
 }
 
 void layerTestDisplay (){
@@ -682,7 +745,13 @@ void projectileManager () {
         case ASTFOUR:
         case FASTONE:
         case FASTTWO:
-          gained (tempProjectile);
+          byte opposingFace = faceDirection[(f+3)%6];
+          if (tempDirection == INWARD && opposingFace != EDGE ){
+            sendProjectileOnFace(tempProjectile, opposingFace);
+          }
+          else {
+            gained (tempProjectile);
+          }
           break;
       }
       receivedProjectiles[f] = NOTHING; // Projectile handled, clear from receiving array.
@@ -1027,6 +1096,8 @@ void displayHandler() {
     case MULTIPLAYER:
     case SETUP:
       inGameDisplay();
+      //if (levelDone) setColor (WHITE);
+      //commsDebugDisplay();
       break;
     case GAMEOVER:
       gameoverDisplay();

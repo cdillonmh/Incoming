@@ -64,8 +64,8 @@
 // Solo Game Balance
 #define GAMESTARTDELAY 1200
 #define GAMEENDDELAY 5000
-#define BASEASTEROIDDELAYMS 800
-#define ADDITIONALDELAYMAXMS 800
+#define BASEASTEROIDDELAYMS 1200
+#define ADDITIONALDELAYMAXMS 1000
 #define INITIALNUMASTEROIDS 8
 
 // Solo Leveling Balance
@@ -322,8 +322,6 @@ byte returnPrevFace (byte face) {
 }
 
 
-
-
 // Check and handle solo mode asteroid spawns
 void checkSpawnAsteroid () {
   if (isEarth && gameState == SINGLEPLAYER) {
@@ -357,9 +355,6 @@ void checkSpawnAsteroid () {
     }
   }
 }
-
-
-
 
 
 // Check and handle expired projectile timers

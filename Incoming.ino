@@ -97,6 +97,7 @@ byte fasteroidType = NOTHING;
 bool hasMissile = false;
 bool missileRequested = false;
 int missileRequestFace = -1;
+byte leftOfMissileRequestFace = 8;
 byte requestQueue[REQUESTQUEUESIZE];
 byte requestQueueEmptyValue;
 bool isExploding = false;
@@ -262,6 +263,7 @@ void determineDirectionality () {
         if (faceDirection[nextFace] == INWARD) {
           faceDirection[currentFace] = FORWARD;
           missileRequestFace = nextFace;
+          leftOfMissileRequestFace = currentFace;
         }
         else {
           faceDirection[currentFace] = BACKWARD;
@@ -273,6 +275,7 @@ void determineDirectionality () {
       if (faceDirection[currentFace] == EDGE && faceDirection[nextFace] != EDGE) {
         faceDirection[nextFace] = INWARD;
         missileRequestFace = nextFace;
+        leftOfMissileRequestFace = currentFace;
         if (faceDirection[returnNextFace(nextFace)] != EDGE){
           faceDirection[returnNextFace(nextFace)] = INWARD;
         }
@@ -311,13 +314,13 @@ void projectileTimerHandler () {
         sendProjectileOnFace(ASTFOUR,missileRequestFace);
         break;
       case ASTTWO:
-        sendProjectileOnFace(ASTONE,(missileRequestFace+5)%6);
+        sendProjectileOnFace(ASTONE,leftOfMissileRequestFace);
         break;
       case ASTTHREE:
-        sendProjectileOnFace(ASTTWO,(missileRequestFace+5)%6);
+        sendProjectileOnFace(ASTTWO,leftOfMissileRequestFace);
         break;
       case ASTFOUR:
-        sendProjectileOnFace(ASTTHREE,(missileRequestFace+5)%6);
+        sendProjectileOnFace(ASTTHREE,leftOfMissileRequestFace);
         break;
     }
   }
@@ -329,7 +332,7 @@ void projectileTimerHandler () {
         sendProjectileOnFace(FASTTWO,missileRequestFace);
         break;
       case FASTTWO:
-        sendProjectileOnFace(FASTONE,(missileRequestFace+5)%6);
+        sendProjectileOnFace(FASTONE,leftOfMissileRequestFace);
         break;
     }
   }
@@ -482,6 +485,7 @@ void resetAll () {
   hasMissile = false;
   missileRequested = false;
   missileRequestFace = -1;
+  leftOfMissileRequestFace = 8;
   clearRequestQueue();
   //isExploding = false;
   isSpawner = false;
@@ -839,7 +843,7 @@ void inGameDisplay () {
       setColor (SPACECOLOR);
     }
     
-  renderAsteroids(false);
+  renderAsteroids();
     
   }
 
@@ -862,7 +866,7 @@ void renderExplosion () {
 void renderEarth () {
   int startingFace;
   
-  if (gameState == SINGLEPLAYER || gameState == MULTIPLAYER) {
+  if (gameState != SETUP) {
     startingFace = int(animationTimer.getRemaining() / (ANIMATIONTIMERMS / FACE_COUNT));
   }
   else {
@@ -884,111 +888,45 @@ void renderEarth () {
     }
 }
 
-void renderAsteroids (bool debug) {
-  if (debug) {
+void renderAsteroids () {
     switch (asteroidType) {
-      case ASTONE:
-        setColor (RED);
+      case ASTFOUR:
+      case ASTTHREE:
+          if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS/2)) {
+          setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,2,3,missileRequestFace);
+        }
+        else {
+          setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,4,5,missileRequestFace);
+        }
         break;
       case ASTTWO:
-        setColor (ORANGE);
-        break;
-      case ASTTHREE:
-        setColor (YELLOW);
-        break;
-      case ASTFOUR:
-        setColor (WHITE);
-        break;
+      case ASTONE:
+        if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS/2)) {
+          setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,1,2,missileRequestFace);
+        }
+        else {
+          setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,0,5,missileRequestFace);
+        }
     }
-      switch (fasteroidType) {
-      case FASTONE:
-        setColor (BLUE);
-        break;
+
+    switch (fasteroidType) {
       case FASTTWO:
-        setColor (GREEN);
-        break;
-    }
-  }
-  else {
-//    if (asteroidType == ASTFOUR || asteroidType == ASTTHREE) {
-//      if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.66)) {
-//        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,2,3,missileRequestFace);
-//      }
-//      else if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.33)) {
-//        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,3,4,missileRequestFace);
-//      }
-//      else {
-//        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,4,5,missileRequestFace);
-//      }
-//    }
-//    else if (asteroidType == ASTTWO || asteroidType == ASTONE) {
-//      if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.66)) {
-//        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,2,3,missileRequestFace);
-//      }
-//      else if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.33)) {
-//        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,1,2,missileRequestFace);
-//      }
-//      else {
-//        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,0,1,missileRequestFace);
-//      }
-//    }
-//    
-//    if (fasteroidType == FASTTWO) {
-//      if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.66)) {
-//        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,2,3,missileRequestFace);
-//      }
-//      else if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.33)) {
-//        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,3,4,missileRequestFace);
-//      }
-//      else {
-//        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,4,5,missileRequestFace);
-//      }
-//    }
-//    else if (fasteroidType == FASTONE) {
-//      if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.66)) {
-//        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,2,3,missileRequestFace);
-//      }
-//      else if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.33)) {
-//        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,1,2,missileRequestFace);
-//      }
-//      else {
-//        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,0,1,missileRequestFace);
-//      }
-//    }
-    if (asteroidType == ASTFOUR || asteroidType == ASTTHREE) {
-      if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.5)) {
-        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,2,3,missileRequestFace);
-      }
-      else {
-        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,4,5,missileRequestFace);
-      }
-    }
-    else if (asteroidType == ASTTWO || asteroidType == ASTONE) {
-      if (asteroidTimer.getRemaining() > (ASTEROIDTRANSITTIMEMS * 0.5)) {
-        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,1,2,missileRequestFace);
-      }
-      else {
-        setColorOnTwoFacesCWFromSource(ASTEROIDCOLOR,0,5,missileRequestFace);
-      }
-    }
-    
-    if (fasteroidType == FASTTWO) {
-      if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.5)) {
-        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,2,3,missileRequestFace);
-      }
-      else {
-        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,4,5,missileRequestFace);
-      }
-    }
-    else if (fasteroidType == FASTONE) {
-      if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS * 0.5)) {
+        if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS/2)) {
+          setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,2,3,missileRequestFace);
+        }
+        else {
+          setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,4,5,missileRequestFace);
+        }
+      break;
+      case FASTONE:
+        if (fasteroidTimer.getRemaining() > (FASTEROIDTRANSITTIMEMS/2)) {
         setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,1,2,missileRequestFace);
-      }
-      else {
-        setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,0,5,missileRequestFace);
-      }
+        }
+        else {
+          setColorOnTwoFacesCWFromSource(FASTEROIDCOLOR,0,5,missileRequestFace);
+        }
+      break;
     }
-  }
 }
 
 void setColorOnTwoFacesCWFromSource (Color col, byte face1, byte face2, byte source) {
@@ -1045,8 +983,8 @@ void commsDebugDisplay () {
 }
 
 void rechargingDisplay () {
-  if (!missileCooldownTimer.isExpired()) {
-    int cooldownValue = missileCooldownTimer.getRemaining();
+  int cooldownValue = missileCooldownTimer.getRemaining();
+  if (cooldownValue != 0) {
     if (isSpawner) {
       setColorOnFace(CHARGETIMERCOLOR,(missileRequestFace + (cooldownValue/(FASTEROIDCOOLDOWNTIMEMS / FACE_COUNT)))%6);
     }

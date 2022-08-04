@@ -286,7 +286,8 @@ void determineDirectionality () {
 
 // Check if game should start
 void checkStartGame () {
-  if (buttonSingleClicked() && !hasWoken()){
+
+  if (buttonSingleClicked() && !hasWoken()){ 
     if (isEarth) {
       gameState = SINGLEPLAYER;
     }
@@ -447,7 +448,7 @@ void checkResetGame () {
 }
 
 void clearRequestQueue () {
-  for (int i; i<=(REQUESTQUEUESIZE-1); i++) {
+  for (byte i; i<=(REQUESTQUEUESIZE-1); i++) {
     requestQueue[i] = requestQueueEmptyValue;
   }
 }
@@ -722,7 +723,7 @@ void gained (byte proj) {
 }
 
 void addMissileRequest (byte src) {
-  for (int f = 0; f<=(REQUESTQUEUESIZE-1); f++) {
+  for (byte f = 0; f<=(REQUESTQUEUESIZE-1); f++) {
     if (requestQueue[f] == requestQueueEmptyValue) {
       requestQueue[f] = src;
       commsTimeoutTimer.set(COMMSTIMEOUTTIMERMS);
@@ -745,7 +746,7 @@ byte getNextRequest () {
 }
 
 void processRequestQueue () {
-  for (int f = 0; f<=(REQUESTQUEUESIZE-2); f++) {
+  for (byte f = 0; f<=(REQUESTQUEUESIZE-2); f++) {
     int nextPos = f+1;
     if ((requestQueue[f] == requestQueueEmptyValue) && (requestQueue[nextPos] != requestQueueEmptyValue)) {
       requestQueue[f] = requestQueue[nextPos];
@@ -1022,15 +1023,10 @@ void displayHandler() {
   if (animationTimer.isExpired()) animationTimer.set(ANIMATIONTIMERMS);
   
   switch (gameState) {
-    case SETUP:
-      inGameDisplay();
-      //layerTestDisplay(); // Verifies layer functionality
-      //directionalityTestDisplay(); // Verifies directionality functionality
-      break;
     case SINGLEPLAYER:
     case MULTIPLAYER:
+    case SETUP:
       inGameDisplay();
-      //commsDebugDisplay();
       break;
     case GAMEOVER:
       gameoverDisplay();
